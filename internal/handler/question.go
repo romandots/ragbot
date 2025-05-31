@@ -4,22 +4,45 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"ragbot/internal/config"
+	"ragbot/internal/conversation"
 
 	"github.com/pgvector/pgvector-go"
 	"ragbot/internal/ai"
 )
 
-// ProcessQuestion выполняет RAG-логику и возвращает ответ
-type QuestionHandler func(db *sql.DB, aiClient *ai.AIClient, question string) (string, error)
+// ProcessQuestionWithHistory собирает историю, фрагменты из chunks и формирует единый prompt.
+func ProcessQuestionWithHistory(
+	db *sql.DB,
+	aiClient *ai.AIClient,
+	chatID int64,
+	question string,
+) (string, error) {
+	var histText string
+	if chatID != 0 {
+		// 1) Получаем всю историю сообщений для этого chatID
+		history := conversation.GetHistory(chatID)
 
-func ProcessQuestion(db *sql.DB, aiClient *ai.AIClient, question string) (string, error) {
-	// 1) Эмбеддинг вопроса
+		// 2) Формируем блок истории в виде текста
+		//    Например:
+		//    "История беседы:\nПользователь: ...\nПомощник: ...\nПользователь: ...\n"
+		histText = "История беседы:\n"
+		for _, item := range history {
+			if item.Role == "user" {
+				histText += "Пользователь: " + item.Content + "\n"
+			} else if item.Role == "assistant" {
+				histText += "Помощник: " + item.Content + "\n"
+			}
+		}
+	}
+
+	// 3) Делаем эмбеддинг текущего вопроса через AIClient
 	queryVec, err := aiClient.GenerateEmbedding(question)
 	if err != nil {
 		return "", err
 	}
 
-	// 2) Поиск похожих чанков в БД
+	// 4) Ищем фрагменты из chunks (top 5)
 	rows, err := db.QueryContext(context.Background(),
 		`SELECT content FROM chunks ORDER BY embedding <-> $1 LIMIT 5`,
 		pgvector.NewVector(queryVec),
@@ -29,24 +52,31 @@ func ProcessQuestion(db *sql.DB, aiClient *ai.AIClient, question string) (string
 	}
 	defer rows.Close()
 
-	// Собираем найденные фрагменты
 	var fragments []string
 	for rows.Next() {
 		var c string
-		err := rows.Scan(&c)
-		if err != nil {
+		if err := rows.Scan(&c); err != nil {
 			return "", fmt.Errorf("Row scan error: %v", err)
 		}
 		fragments = append(fragments, c)
 	}
 
-	// 3) Формируем prompt
-	prompt := "Ты — помощник CRM. Используй фрагменты базы знаний:\n---\n"
+	// 5) Формируем блок фрагментов
+	var fragText string
+	fragText = "Используй фрагменты базы знаний:\n---\n"
 	for _, c := range fragments {
-		prompt += c + "\n"
+		fragText += c + "\n"
 	}
-	prompt += "---\nВопрос: " + question + "\nОтвет:\n"
+	fragText += "---\n"
 
-	// 4) Генерация ответа через AIClient
+	// 6) Собираем окончательный prompt:
+	//    <Preamble> +
+	//    <histText> +
+	//    <fragText> +
+	//    "Вопрос: <question>\nОтвет:\n"
+	prompt := config.LoadSettings().Preamble + "\n" + histText + "\n" + fragText + "Вопрос: " + question + "\nОтвет:\n"
+
+	// 7) Генерируем ответ по полному prompt
+	fmt.Println("Prompt: " + prompt)
 	return aiClient.GenerateResponse(prompt)
 }

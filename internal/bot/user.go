@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"ragbot/internal/conversation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
@@ -30,13 +31,22 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 		if update.Message == nil {
 			continue
 		}
-		question := update.Message.Text
-		// Вызовем handler.ProcessQuestion (раньше было handler.ProcessQuestion, но handler не был импортирован)
-		answer, err := handler.ProcessQuestion(db, aiClient, question)
-		msgText := answer
+		chatID := update.Message.Chat.ID
+		userText := update.Message.Text
+
+		// 1) Вызываем обработку вопроса (RAG + учёт истории)
+		answer, err := handler.ProcessQuestionWithHistory(db, aiClient, chatID, userText)
 		if err != nil {
-			msgText = fmt.Sprintf("Ошибка: %v", err)
+			answer = fmt.Sprintf("Ошибка: %v", err)
 		}
-		bot.Send(tgbotapi.NewMessage(update.Message.Chat.ID, msgText))
+
+		// 2) Сохраняем вопрос пользователя в историю
+		conversation.AppendHistory(chatID, "user", userText)
+
+		// 3) Сохраняем ответ бота в историю
+		conversation.AppendHistory(chatID, "assistant", answer)
+
+		// 4) Отправляем ответ
+		bot.Send(tgbotapi.NewMessage(chatID, answer))
 	}
 }

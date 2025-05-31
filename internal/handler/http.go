@@ -32,8 +32,7 @@ func StartHTTP(db *sql.DB, aiClient *ai.AIClient) {
 			return
 		}
 
-		// Заменили вызов processQuestion на ProcessQuestion
-		answer, err := ProcessQuestion(db, aiClient, req.Question)
+		answer, err := ProcessQuestionWithHistory(db, aiClient, 0, req.Question)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error: %v", err), http.StatusInternalServerError)
 			return

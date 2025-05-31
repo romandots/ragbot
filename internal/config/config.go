@@ -8,7 +8,7 @@ import (
 )
 
 // Config хранит все переменные окружения приложения
-type Config struct {
+type config struct {
 	DatabaseURL        string
 	UseLocalModel      bool
 	OpenAIAPIKey       string
@@ -17,7 +17,18 @@ type Config struct {
 	AdminChatIDs       []int64
 }
 
-func LoadConfig() *Config {
+type settings struct {
+	Preamble string
+}
+
+var Config *config
+var Settings *settings
+
+func LoadConfig() *config {
+	if Config != nil {
+		return Config
+	}
+
 	url := os.Getenv("DATABASE_URL")
 	if url == "" {
 		log.Fatalln("DATABASE_URL not set")
@@ -56,7 +67,7 @@ func LoadConfig() *Config {
 		}
 	}
 
-	return &Config{
+	Config := &config{
 		DatabaseURL:        url,
 		UseLocalModel:      useLocal,
 		OpenAIAPIKey:       apiKey,
@@ -64,4 +75,27 @@ func LoadConfig() *Config {
 		AdminTelegramToken: adminToken,
 		AdminChatIDs:       adminIDs,
 	}
+
+	return Config
+}
+
+func LoadSettings() *settings {
+	if Settings != nil {
+		return Settings
+	}
+
+	Settings := &settings{
+		Preamble: `
+Ты — помощник, консультант, менеджер по продажам и администратор школы танцев «Без правил». 
+Если тебя спросят, кто ты, ты должен представляться как "танцультант школы танцев «Без правил»".
+Хоть ты и не человек, но ты обладаешь знаниями, достаточными для того, чтобы ответить на часто задаваемые
+вопросы о школе танцев «Без правил». Если у тебя нет точного отвеа на поставленный вопрос, честно в этом признайся
+и предложи пригласить в чат реального администратора школы танцев «Без правил». Твоя основная задача — 
+помочь клиенту выбрать танцевальное направление, ответить на вопросы о режиме работы, расписании, адресах
+студий и др. Когда у клиента больше не остается вопросов, консультации должны заканчиваться предложением посетить пробное 
+занятие или приобрести абонемент на выбранное направление.
+`,
+	}
+
+	return Settings
 }

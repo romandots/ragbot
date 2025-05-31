@@ -49,27 +49,24 @@ func StartAdminBot(db *sql.DB, aiClient *ai.AIClient, token string, allowedIDs [
 			continue
 		}
 
+		// /help
+		if strings.HasPrefix(text, "/help ") {
+			bot.Send(tgbotapi.NewMessage(chatID,
+				"Команды администратора:\n"+
+					"/help — эта справка\n"+
+					"/myid — получить свой chat_id\n"+
+					"/delete <id> — удалить фрагмент по ID\n"+
+					"/update <id> <текст> — обновить фрагмент по ID\n\n"+
+					"Все остальное будет интерпретировано как запись в базу знаний"))
+			continue
+		}
+
 		// Все остальные команды должны выполняться только админами
 		if !allowed[chatID] {
 			continue
 		}
 
 		switch {
-		// /add <текст> — добавить новый фрагмент в chunks
-		case strings.HasPrefix(text, "/add "):
-			content := strings.TrimPrefix(text, "/add ")
-			// Для добавления фрагмента нужен эмбеддинг через aiClient
-			emb, err := aiClient.GenerateEmbedding(content)
-			if err != nil {
-				bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Embedding error: %v", err)))
-				continue
-			}
-			_, _ = db.ExecContext(context.Background(),
-				"INSERT INTO chunks(content, embedding) VALUES($1, $2)",
-				content, pgvector.NewVector(emb),
-			)
-			bot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
-
 		// /delete <id> — удалить фрагмент по id
 		case strings.HasPrefix(text, "/delete "):
 			idStr := strings.TrimPrefix(text, "/delete ")
@@ -108,12 +105,18 @@ func StartAdminBot(db *sql.DB, aiClient *ai.AIClient, token string, allowedIDs [
 			bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Обновлён фрагмент %d", id)))
 
 		default:
-			bot.Send(tgbotapi.NewMessage(chatID,
-				"Команды администратора:\n"+
-					"/myid — получить свой chat_id\n"+
-					"/add <текст> — добавить фрагмент\n"+
-					"/delete <id> — удалить фрагмент по ID\n"+
-					"/update <id> <текст> — обновить фрагмент по ID"))
+			content := strings.Trim(text, " ")
+			// Для добавления фрагмента нужен эмбеддинг через aiClient
+			emb, err := aiClient.GenerateEmbedding(content)
+			if err != nil {
+				bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Embedding error: %v", err)))
+				continue
+			}
+			_, _ = db.ExecContext(context.Background(),
+				"INSERT INTO chunks(content, embedding) VALUES($1, $2)",
+				content, pgvector.NewVector(emb),
+			)
+			bot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
 		}
 	}
 }
