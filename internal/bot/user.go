@@ -41,10 +41,10 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 		}
 
 		// 2) Сохраняем вопрос пользователя в историю
-		conversation.AppendHistory(chatID, "user", userText)
+		conversation.AppendHistory(db, chatID, "user", userText)
 
 		// 3) Сохраняем ответ бота в историю
-		conversation.AppendHistory(chatID, "assistant", answer)
+		conversation.AppendHistory(db, chatID, "assistant", answer)
 
 		// 4) Отправляем ответ
 		bot.Send(tgbotapi.NewMessage(chatID, answer))

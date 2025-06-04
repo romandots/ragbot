@@ -21,7 +21,7 @@ func ProcessQuestionWithHistory(
 	var histText string
 	if chatID != 0 {
 		// 1) Получаем всю историю сообщений для этого chatID
-		history := conversation.GetHistory(chatID)
+		history := conversation.GetHistory(db, chatID)
 
 		// 2) Формируем блок истории в виде текста
 		//    Например:
