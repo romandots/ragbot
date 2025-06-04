@@ -14,6 +14,8 @@ type AppConfig struct {
 	UserTelegramToken  string
 	AdminTelegramToken string
 	AdminChatIDs       []int64
+	EducationFilePath  string
+	UseExternalSource  bool
 }
 
 type AppSettings struct {
@@ -53,6 +55,12 @@ func LoadConfig() *AppConfig {
 		log.Fatalln("ADMIN_TELEGRAM_TOKEN not set")
 	}
 
+	eduFile := os.Getenv("EDU_FILE_PATH")
+	useExternal := false
+	if os.Getenv("USE_EXTERNAL_SOURCE") == "true" {
+		useExternal = true
+	}
+
 	// Читаем ADMIN_CHAT_IDS как строку "id1,id2,id3"
 	adminIDsEnv := os.Getenv("ADMIN_CHAT_IDS")
 	var adminIDs []int64
@@ -73,6 +81,8 @@ func LoadConfig() *AppConfig {
 		UserTelegramToken:  userToken,
 		AdminTelegramToken: adminToken,
 		AdminChatIDs:       adminIDs,
+		EducationFilePath:  eduFile,
+		UseExternalSource:  useExternal,
 	}
 
 	return Config
