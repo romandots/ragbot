@@ -44,14 +44,14 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 			switch data {
 			case "CALL_MANAGER":
 				// Сохраняем в историю факт нажатия (необязательно, но можно)
-				conversation.AppendHistory(chatID, "user", "нажал кнопку Вызвать менеджера")
+				conversation.AppendHistory(db, chatID, "user", "нажал кнопку Вызвать менеджера")
 
 				// Отправляем пользователю подтверждение
 				reply := tgbotapi.NewMessage(chatID, "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
 				bot.Send(reply)
 
 				// Сохраняем в историю ответ
-				conversation.AppendHistory(chatID, "assistant", "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
+				conversation.AppendHistory(db, chatID, "assistant", "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
 
 				// Если нужно — уведомляем менеджера (в админ-чат или личным сообщением)
 				// Например, пусть менеджер сидит в чате с ID = ADMIN_CHAT_ID
@@ -76,7 +76,7 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 
 		// 0) Если пользователь хочет «записаться» — предлагаем кнопку «Вызвать менеджера»
 		if strings.Contains(lower, "записаться") || strings.Contains(lower, "позови") || strings.Contains(lower, "человека") {
-			conversation.AppendHistory(chatID, "user", userText)
+			conversation.AppendHistory(db, chatID, "user", userText)
 			// Формируем inline-клавиатуру с одной кнопкой
 			// При нажатии будет послан callback с данными "CALL_MANAGER"
 			msg := getCallManagerButton(chatID)
