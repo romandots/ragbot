@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	_ "database/sql"
 	"log"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -10,6 +12,8 @@ import (
 	"ragbot/internal/bot"
 	"ragbot/internal/config"
 	"ragbot/internal/db"
+	"ragbot/internal/education"
+	"ragbot/internal/embedding"
 	"ragbot/internal/handler"
 )
 
@@ -29,9 +33,24 @@ func main() {
 	// Запускаем HTTP-сервер
 	go handler.StartHTTP(database, aiClient)
 
-	// Запускаем Telegram-ботов
+	// Запускаем Telegram-бот и источники данных
 	go bot.StartUserBot(database, aiClient, cfg.UserTelegramToken)
-	go bot.StartAdminBot(database, aiClient, cfg.AdminTelegramToken, cfg.AdminChatIDs)
+
+	ctx := context.Background()
+	sources := []education.Source{
+		&education.AdminSource{Token: cfg.AdminTelegramToken, AllowedIDs: cfg.AdminChatIDs},
+	}
+	if cfg.EducationFilePath != "" {
+		sources = append(sources, &education.FileSource{Path: cfg.EducationFilePath, Interval: time.Hour})
+	}
+	if cfg.UseExternalSource {
+		sources = append(sources, &education.ExternalDBSource{})
+	}
+	for _, s := range sources {
+		s.Start(ctx, database)
+	}
+
+	embedding.StartWorker(database, aiClient)
 
 	select {} // блокируем main
 }
