@@ -9,7 +9,7 @@ RUN go mod download
 COPY ./ .
 
 # Build Go binary
-RUN go build -o ragbot main.go
+RUN go build -o ragbot cmd/ragbot/main.go
 
 # Final image
 FROM alpine:latest
