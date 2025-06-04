@@ -36,3 +36,19 @@ docker-compose --env-file .env up --build
 
 После запуска сервис будет доступен на `http://localhost:8080`.
 
+## Миграции базы данных
+
+Для управления схемой используется [Goose](https://github.com/pressly/goose).
+При запуске приложения все миграции из директории `migrations` применяются автоматически.
+При необходимости запустить их вручную установите утилиту:
+
+```bash
+go install github.com/pressly/goose/v3/cmd/goose@latest
+```
+
+Затем выполните:
+
+```bash
+goose -dir migrations postgres $DATABASE_URL up
+```
+
