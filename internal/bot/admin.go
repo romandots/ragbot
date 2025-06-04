@@ -50,7 +50,7 @@ func StartAdminBot(db *sql.DB, aiClient *ai.AIClient, token string, allowedIDs [
 		}
 
 		// /help
-		if strings.HasPrefix(text, "/help ") {
+		if strings.HasPrefix(text, "/help") {
 			bot.Send(tgbotapi.NewMessage(chatID,
 				"Команды администратора:\n"+
 					"/help — эта справка\n"+

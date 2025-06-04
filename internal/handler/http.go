@@ -27,6 +27,7 @@ func StartHTTP(db *sql.DB, aiClient *ai.AIClient) {
 
 	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
 		var req QueryRequest
+		defer r.Body.Close()
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
