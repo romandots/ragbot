@@ -7,8 +7,7 @@ import (
 	"strings"
 )
 
-// Config хранит все переменные окружения приложения
-type config struct {
+type AppConfig struct {
 	DatabaseURL        string
 	UseLocalModel      bool
 	OpenAIAPIKey       string
@@ -17,14 +16,14 @@ type config struct {
 	AdminChatIDs       []int64
 }
 
-type settings struct {
+type AppSettings struct {
 	Preamble string
 }
 
-var Config *config
-var Settings *settings
+var Config *AppConfig
+var Settings *AppSettings
 
-func LoadConfig() *config {
+func LoadConfig() *AppConfig {
 	if Config != nil {
 		return Config
 	}
@@ -67,7 +66,7 @@ func LoadConfig() *config {
 		}
 	}
 
-	Config := &config{
+	Config := &AppConfig{
 		DatabaseURL:        url,
 		UseLocalModel:      useLocal,
 		OpenAIAPIKey:       apiKey,
@@ -79,12 +78,12 @@ func LoadConfig() *config {
 	return Config
 }
 
-func LoadSettings() *settings {
+func LoadSettings() *AppSettings {
 	if Settings != nil {
 		return Settings
 	}
 
-	Settings := &settings{
+	Settings = &AppSettings{
 		Preamble: os.Getenv("PREAMBLE"),
 	}
 
