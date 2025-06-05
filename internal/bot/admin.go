@@ -9,17 +9,14 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/pgvector/pgvector-go"
-	ai "ragbot/internal/ai"
 )
 
 // StartAdminBot запускает Telegram-бота для администрирования базы знаний.
 // Параметры:
-//   - db            : указатель на SQL-соединение
-//   - aiClient      : экземпляр AIClient для генерации эмбеддингов
-//   - token         : токен административного бота (из ENV)
-//   - allowedIDs    : слайс разрешённых chat_id администраторов
-func StartAdminBot(db *sql.DB, aiClient *ai.AIClient, token string, allowedIDs []int64) {
+//   - db         : указатель на SQL-соединение
+//   - token      : токен административного бота (из ENV)
+//   - allowedIDs : слайс разрешённых chat_id администраторов
+func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Fatalf("Admin bot init error: %v", err)
@@ -93,28 +90,17 @@ func StartAdminBot(db *sql.DB, aiClient *ai.AIClient, token string, allowedIDs [
 				continue
 			}
 			content := parts[1]
-			emb, err := aiClient.GenerateEmbedding(content)
-			if err != nil {
-				bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Embedding error: %v", err)))
-				continue
-			}
 			_, _ = db.ExecContext(context.Background(),
-				"UPDATE chunks SET content=$1, embedding=$2 WHERE id=$3",
-				content, pgvector.NewVector(emb), id,
+				"UPDATE chunks SET content=$1, embedding=NULL, processed_at=NULL WHERE id=$2",
+				content, id,
 			)
 			bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Обновлён фрагмент %d", id)))
 
 		default:
 			content := strings.Trim(text, " ")
-			// Для добавления фрагмента нужен эмбеддинг через aiClient
-			emb, err := aiClient.GenerateEmbedding(content)
-			if err != nil {
-				bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Embedding error: %v", err)))
-				continue
-			}
 			_, _ = db.ExecContext(context.Background(),
-				"INSERT INTO chunks(content, embedding) VALUES($1, $2)",
-				content, pgvector.NewVector(emb),
+				"INSERT INTO chunks(content) VALUES($1) ON CONFLICT DO NOTHING",
+				content,
 			)
 			bot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
 		}

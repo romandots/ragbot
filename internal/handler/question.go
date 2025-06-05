@@ -44,7 +44,7 @@ func ProcessQuestionWithHistory(
 
 	// 4) Ищем фрагменты из chunks (top 5)
 	rows, err := db.QueryContext(context.Background(),
-		`SELECT content FROM chunks ORDER BY embedding <-> $1 LIMIT 5`,
+		`SELECT content FROM chunks WHERE processed_at IS NOT NULL ORDER BY embedding <-> $1 LIMIT 5`,
 		pgvector.NewVector(queryVec),
 	)
 	if err != nil {
