@@ -18,7 +18,7 @@ type QueryResponse struct {
 	Answer string `json:"answer"`
 }
 
-// StartHTTP запускает HTTP-сервер с endpoint-ами /health и /query
+// StartHTTP запускает HTTP-сервер с endpoint-ами /health, /query и /chat/{uuid}
 func StartHTTP(db *sql.DB, aiClient *ai.AIClient) {
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -42,6 +42,8 @@ func StartHTTP(db *sql.DB, aiClient *ai.AIClient) {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(QueryResponse{Answer: answer})
 	})
+
+	http.HandleFunc("/chat/", ChatHandler(db))
 
 	log.Println("HTTP server listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
