@@ -9,6 +9,8 @@ import (
 type ChatInfo struct {
 	ChatID  int64
 	Summary sql.NullString
+	Name    sql.NullString
+	Phone   sql.NullString
 }
 
 // EnsureSession makes sure a record exists for the given chatID and returns its uuid.
@@ -34,7 +36,7 @@ func GetChatInfoByUUID(db *sql.DB, uuid string) (ChatInfo, error) {
 	if db == nil {
 		return info, sql.ErrConnDone
 	}
-	err := db.QueryRowContext(context.Background(), `SELECT chat_id, summary FROM conversations WHERE uuid=$1`, uuid).Scan(&info.ChatID, &info.Summary)
+	err := db.QueryRowContext(context.Background(), `SELECT chat_id, summary, name, phone FROM conversations WHERE uuid=$1`, uuid).Scan(&info.ChatID, &info.Summary, &info.Name, &info.Phone)
 	if err != nil {
 		return info, err
 	}
@@ -49,6 +51,28 @@ func UpdateSummary(db *sql.DB, chatID int64, summary string) {
 	_, err := db.ExecContext(context.Background(), `UPDATE conversations SET summary=$1, updated_at=NOW() WHERE chat_id=$2`, summary, chatID)
 	if err != nil {
 		log.Printf("update summary error: %v", err)
+	}
+}
+
+// UpdateName saves user name for chat.
+func UpdateName(db *sql.DB, chatID int64, name string) {
+	if db == nil {
+		return
+	}
+	_, err := db.ExecContext(context.Background(), `UPDATE conversations SET name=$1, updated_at=NOW() WHERE chat_id=$2`, name, chatID)
+	if err != nil {
+		log.Printf("update name error: %v", err)
+	}
+}
+
+// UpdatePhone saves phone number for chat.
+func UpdatePhone(db *sql.DB, chatID int64, phone string) {
+	if db == nil {
+		return
+	}
+	_, err := db.ExecContext(context.Background(), `UPDATE conversations SET phone=$1, updated_at=NOW() WHERE chat_id=$2`, phone, chatID)
+	if err != nil {
+		log.Printf("update phone error: %v", err)
 	}
 }
 
