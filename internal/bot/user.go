@@ -4,8 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"ragbot/internal/conversation"
 	"strings"
+
+	"ragbot/internal/conversation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
@@ -31,6 +32,7 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 	for update := range updates {
 		if update.CallbackQuery != nil {
 			chatID := update.CallbackQuery.Message.Chat.ID
+			conversation.EnsureSession(db, chatID)
 			data := update.CallbackQuery.Data
 
 			// 2.1) Сразу подтверждаем колбек, чтобы Telegram убрал «часики»
@@ -43,8 +45,26 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 			// 2.2) В зависимости от data реагируем
 			switch data {
 			case "CALL_MANAGER":
-				// Сохраняем в историю факт нажатия (необязательно, но можно)
+				// Сохраняем в историю факт нажатия
 				conversation.AppendHistory(db, chatID, "user", "нажал кнопку Вызвать менеджера")
+
+				// Генерируем краткое резюме последних сообщений
+				hist := conversation.GetHistory(db, chatID)
+				var sb strings.Builder
+				for _, h := range hist {
+					if h.Role == "user" {
+						sb.WriteString("Пользователь: " + h.Content + "\n")
+					} else {
+						sb.WriteString("Помощник: " + h.Content + "\n")
+					}
+				}
+				prompt := "Суммаризируй диалог пользователя в двух предложениях:\n" + sb.String() + "\nРезюме:"
+				summary, err := aiClient.GenerateResponse(prompt)
+				if err == nil {
+					conversation.UpdateSummary(db, chatID, summary)
+				} else {
+					log.Printf("summary error: %v", err)
+				}
 
 				// Отправляем пользователю подтверждение
 				reply := tgbotapi.NewMessage(chatID, "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
@@ -71,6 +91,7 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 		}
 
 		chatID := update.Message.Chat.ID
+		conversation.EnsureSession(db, chatID)
 		userText := update.Message.Text
 		lower := strings.ToLower(userText)
 
