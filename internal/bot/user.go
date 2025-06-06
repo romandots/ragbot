@@ -4,11 +4,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"ragbot/internal/config"
+	"ragbot/internal/conversation"
 	"strings"
 	"sync"
-	"time"
-
-	"ragbot/internal/conversation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
@@ -24,26 +23,23 @@ type contactState struct {
 var (
 	stateMu      sync.Mutex
 	contactSteps = make(map[int64]*contactState)
+	userBot      *tgbotapi.BotAPI
+	db           *sql.DB
+	aiClient     *ai.AIClient
 )
 
 // StartUserBot запускает Telegram-бота для пользователей.
-// Параметры:
-//   - db       : указатель на SQL-соединение
-//   - aiClient : экземпляр AIClient для генерации ответов
-//   - token    : токен пользовательского бота (из ENV)
-func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
+func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 	defer util.Recover("StartUserBot")
-	bot, err := tgbotapi.NewBotAPI(token)
-	for err != nil {
-		log.Printf("User bot init error: %v\n", err)
-		time.Sleep(1 * time.Second)
-		log.Println("Trying to connect to Telegram bot API again...")
-		bot, err = tgbotapi.NewBotAPI(token)
-	}
+
+	aiClient = AIClient
+	db = dbConn
+	userBot = connect(token)
+	log.Println("User bot connected to Telegram API")
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	updates := bot.GetUpdatesChan(u)
+	updates := userBot.GetUpdatesChan(u)
 
 	log.Println("User bot started")
 	for update := range updates {
@@ -55,46 +51,14 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 			// 2.1) Сразу подтверждаем колбек, чтобы Telegram убрал «часики»
 			//     Второй аргумент (text) может быть пустым, т.е. просто «OK»
 			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
-			if _, err := bot.Request(callback); err != nil {
+			if _, err := userBot.Request(callback); err != nil {
 				log.Printf("Callback answer error: %v", err)
 			}
 
 			// 2.2) В зависимости от data реагируем
 			switch data {
 			case "CALL_MANAGER":
-				// Сохраняем в историю факт нажатия
-				conversation.AppendHistory(db, chatID, "user", "нажал кнопку Вызвать менеджера")
-
-				// Генерируем краткое резюме последних сообщений
-				hist := conversation.GetHistory(db, chatID)
-				var sb strings.Builder
-				for _, h := range hist {
-					if h.Role == "user" {
-						sb.WriteString("Пользователь: " + h.Content + "\n")
-					} else {
-						sb.WriteString("Помощник: " + h.Content + "\n")
-					}
-				}
-				prompt := "Суммаризируй диалог пользователя в двух предложениях:\n" + sb.String() + "\nРезюме:"
-				summary, err := aiClient.GenerateResponse(prompt)
-				if err == nil {
-					conversation.UpdateSummary(db, chatID, summary)
-				} else {
-					log.Printf("summary error: %v", err)
-				}
-
-				stateMu.Lock()
-				contactSteps[chatID] = &contactState{Stage: 1}
-				stateMu.Unlock()
-
-				msg := tgbotapi.NewMessage(chatID, "Как вас зовут?")
-				bot.Send(msg)
-				conversation.AppendHistory(db, chatID, "assistant", "Как вас зовут?")
-
-				// Если нужно — уведомляем менеджера (в админ-чат или личным сообщением)
-				// Например, пусть менеджер сидит в чате с ID = ADMIN_CHAT_ID
-				// adminMsg := tgbotapi.NewMessage(ADMIN_CHAT_ID, fmt.Sprintf("Пользователь %d хочет записаться на занятие.", chatID))
-				// bot.Send(adminMsg)
+				callManagerAction(chatID)
 
 			// При необходимости можно добавить другие data-коды
 			default:
@@ -124,9 +88,7 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 				st.Stage = 2
 				st.Name = userText
 				stateMu.Unlock()
-				msg := tgbotapi.NewMessage(chatID, "Укажите номер телефона")
-				bot.Send(msg)
-				conversation.AppendHistory(db, chatID, "assistant", "Укажите номер телефона")
+				reply(chatID, "Укажите телефон для связи")
 				continue
 			case 2:
 				conversation.AppendHistory(db, chatID, "user", userText)
@@ -134,52 +96,90 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 				stateMu.Lock()
 				delete(contactSteps, chatID)
 				stateMu.Unlock()
-				msg := tgbotapi.NewMessage(chatID, "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
-				bot.Send(msg)
-				conversation.AppendHistory(db, chatID, "assistant", "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
+				reply(chatID, "Наш менеджер свяжется с вами в ближайшее время")
 				continue
 			}
 		}
 
-		lower := strings.ToLower(userText)
-
-		// 0) Если пользователь хочет «записаться» — предлагаем кнопку «Вызвать менеджера»
-		if strings.Contains(lower, "записаться") || strings.Contains(lower, "позови") || strings.Contains(lower, "человека") {
+		// Если пользователь хочет «записаться» — предлагаем кнопку «Вызвать менеджера»
+		lowerRequest := strings.ToLower(userText)
+		if util.ContainsStringFromSlice(lowerRequest, config.Settings.CallManagerTriggerWords) {
 			conversation.AppendHistory(db, chatID, "user", userText)
-			// Формируем inline-клавиатуру с одной кнопкой
-			// При нажатии будет послан callback с данными "CALL_MANAGER"
-			msg := getCallManagerButton(chatID)
-			bot.Send(msg)
+			userBot.Send(callMeBackButton(chatID))
 			continue
 		}
 
-		// 1) Вызываем обработку вопроса (RAG + учёт истории)
+		// Вызываем обработку вопроса (RAG + учёт истории)
 		answer, err := handler.ProcessQuestionWithHistory(db, aiClient, chatID, userText)
 		if err != nil {
-			answer = fmt.Sprintf("Ошибка: %v", err)
+			SendToAllAdmins(fmt.Sprintf("Возникла ошибка: %s", err))
+			answer = "Возникла ошибка. Пожалуйста, попробуйте повторить ваш запрос позднее."
 		}
-		lowerAnswer := strings.ToLower(answer)
 
-		// 2) Сохраняем вопрос пользователя в историю
 		conversation.AppendHistory(db, chatID, "user", userText)
-
-		// 3) Сохраняем ответ бота в историю
 		conversation.AppendHistory(db, chatID, "assistant", answer)
 
+		lowerAnswer := strings.ToLower(answer)
 		if strings.Contains(lowerAnswer, "позвать менеджера") {
-			// Формируем inline-клавиатуру с одной кнопкой
-			// При нажатии будет послан callback с данными "CALL_MANAGER"
-			msg := getCallManagerButton(chatID)
-			bot.Send(msg)
+			userBot.Send(callMeBackButton(chatID))
 			continue
 		}
 
-		// 4) Отправляем ответ
-		bot.Send(tgbotapi.NewMessage(chatID, answer))
+		reply(chatID, answer)
 	}
 }
 
-func getCallManagerButton(chatID int64) tgbotapi.MessageConfig {
+func callManagerAction(chatID int64) {
+	conversation.AppendHistory(db, chatID, "user", "нажал кнопку Вызвать менеджера")
+
+	summary, err := summarize(db, aiClient, chatID)
+	if err == nil {
+		conversation.UpdateSummary(db, chatID, summary)
+	} else {
+		log.Printf("summary error: %v", err)
+	}
+
+	stateMu.Lock()
+	contactSteps[chatID] = &contactState{Stage: 1}
+	stateMu.Unlock()
+
+	reply(chatID, "Как к вам можно обращаться?")
+
+	// Уведомляем администраторов
+	info, err := conversation.GetChatInfoByChatID(db, chatID)
+	if err != nil {
+		log.Printf("Разговор не найден")
+		return
+	}
+	link := fmt.Sprintf("%s/chat/%s", config.Config.BaseURL, info.ID)
+	adminMsg := fmt.Sprintf("%s (%s): %s\n\n%s", info.Name.String, info.Phone.String, info.Summary.String, link)
+
+	SendToAllAdmins(adminMsg)
+}
+
+func summarize(db *sql.DB, aiClient *ai.AIClient, chatID int64) (string, error) {
+	// Генерируем краткое резюме последних сообщений
+	hist := conversation.GetHistory(db, chatID)
+	var sb strings.Builder
+	for _, h := range hist {
+		if h.Role == "user" {
+			sb.WriteString("Пользователь: " + h.Content + "\n")
+		} else {
+			sb.WriteString("Помощник: " + h.Content + "\n")
+		}
+	}
+	prompt := "Суммаризируй диалог пользователя в двух предложениях:\n" + sb.String() + "\nРезюме:"
+	summary, err := aiClient.GenerateResponse(prompt)
+	return summary, err
+}
+
+func reply(chatID int64, message string) {
+	msg := tgbotapi.NewMessage(chatID, message)
+	userBot.Send(msg)
+	conversation.AppendHistory(db, chatID, "assistant", message)
+}
+
+func callMeBackButton(chatID int64) tgbotapi.MessageConfig {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Позвать менеджера в чат", "CALL_MANAGER"),

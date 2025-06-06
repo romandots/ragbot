@@ -7,6 +7,7 @@ import (
 )
 
 type ChatInfo struct {
+	ID      string
 	ChatID  int64
 	Summary sql.NullString
 	Name    sql.NullString
@@ -28,6 +29,18 @@ func EnsureSession(db *sql.DB, chatID int64) (string, error) {
 		return "", err
 	}
 	return uuid, nil
+}
+
+func GetChatInfoByChatID(db *sql.DB, chatID int64) (ChatInfo, error) {
+	var info ChatInfo
+	if db == nil {
+		return info, sql.ErrConnDone
+	}
+	err := db.QueryRowContext(context.Background(), `SELECT uuid, summary, name, phone FROM conversations WHERE chat_id=$1`, chatID).Scan(&info.ID, &info.Summary, &info.Name, &info.Phone)
+	if err != nil {
+		return info, err
+	}
+	return info, nil
 }
 
 // GetChatInfoByUUID returns chat id and summary by uuid.

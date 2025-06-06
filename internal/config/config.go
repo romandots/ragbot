@@ -8,6 +8,7 @@ import (
 )
 
 type AppConfig struct {
+	BaseURL            string
 	DatabaseURL        string
 	UseLocalModel      bool
 	OpenAIAPIKey       string
@@ -19,7 +20,8 @@ type AppConfig struct {
 }
 
 type AppSettings struct {
-	Preamble string
+	Preamble                string
+	CallManagerTriggerWords []string
 }
 
 var Config *AppConfig
@@ -28,6 +30,11 @@ var Settings *AppSettings
 func LoadConfig() *AppConfig {
 	if Config != nil {
 		return Config
+	}
+
+	baseURL := os.Getenv("BASE_URL")
+	if baseURL == "" {
+		baseURL = "localhost:8080"
 	}
 
 	url := os.Getenv("DATABASE_URL")
@@ -75,6 +82,7 @@ func LoadConfig() *AppConfig {
 	}
 
 	Config := &AppConfig{
+		BaseURL:            baseURL,
 		DatabaseURL:        url,
 		UseLocalModel:      useLocal,
 		OpenAIAPIKey:       apiKey,
@@ -93,8 +101,14 @@ func LoadSettings() *AppSettings {
 		return Settings
 	}
 
+	callManagerTriggerWords := os.Getenv("CALL_MANAGER_TRIGGER_WORDS")
+	if callManagerTriggerWords == "" {
+		callManagerTriggerWords = "записаться,позвать,позови,менеджер,оператор"
+	}
+
 	Settings = &AppSettings{
-		Preamble: os.Getenv("PREAMBLE"),
+		Preamble:                os.Getenv("PREAMBLE"),
+		CallManagerTriggerWords: strings.Split(callManagerTriggerWords, ","),
 	}
 
 	return Settings

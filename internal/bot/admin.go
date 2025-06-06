@@ -4,14 +4,19 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
+	"ragbot/internal/util"
 	"strconv"
 	"strings"
-	"time"
-
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"ragbot/internal/util"
 )
+
+func init() {
+	//sync.Once{}
+}
+
+var adminChats []int64
+var adminBot *tgbotapi.BotAPI
 
 // StartAdminBot запускает Telegram-бота для администрирования базы знаний.
 // Параметры:
@@ -20,15 +25,12 @@ import (
 //   - allowedIDs : слайс разрешённых chat_id администраторов
 func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 	defer util.Recover("StartAdminBot")
-	bot, err := tgbotapi.NewBotAPI(token)
-	for err != nil {
-		log.Printf("Admin bot init error: %v\n", err)
-		time.Sleep(1 * time.Second)
-		log.Println("Trying to connect to Telegram bot API again...")
-		bot, err = tgbotapi.NewBotAPI(token)
-	}
+
+	adminBot = connect(token)
+	log.Println("Admin bot connected to Telegram API")
 
 	// Собираем множество разрешённых ChatID
+	adminChats = allowedIDs
 	allowed := make(map[int64]bool)
 	for _, id := range allowedIDs {
 		allowed[id] = true
@@ -36,7 +38,7 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
-	updates := bot.GetUpdatesChan(u)
+	updates := adminBot.GetUpdatesChan(u)
 
 	log.Println("Admin bot started")
 	for update := range updates {
@@ -48,13 +50,13 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 
 		// Команда /myid доступна всем пользователям
 		if text == "/myid" {
-			bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Your chat_id is: %d", chatID)))
+			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Your chat_id is: %d", chatID)))
 			continue
 		}
 
 		// /help
 		if strings.HasPrefix(text, "/help") {
-			bot.Send(tgbotapi.NewMessage(chatID,
+			adminBot.Send(tgbotapi.NewMessage(chatID,
 				"Команды администратора:\n"+
 					"/help — эта справка\n"+
 					"/myid — получить свой chat_id\n"+
@@ -75,24 +77,24 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 			idStr := strings.TrimPrefix(text, "/delete ")
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				bot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
+				adminBot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
 				continue
 			}
 			_, _ = db.ExecContext(context.Background(),
 				"DELETE FROM chunks WHERE id = $1", id,
 			)
-			bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Удалён фрагмент %d", id)))
+			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Удалён фрагмент %d", id)))
 
 		// /update <id> <новый текст> — обновить существующий фрагмент
 		case strings.HasPrefix(text, "/update "):
 			parts := strings.SplitN(strings.TrimPrefix(text, "/update "), " ", 2)
 			if len(parts) < 2 {
-				bot.Send(tgbotapi.NewMessage(chatID, "Использование: /update <id> <новый текст>"))
+				adminBot.Send(tgbotapi.NewMessage(chatID, "Использование: /update <id> <новый текст>"))
 				continue
 			}
 			id, err := strconv.Atoi(parts[0])
 			if err != nil {
-				bot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
+				adminBot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
 				continue
 			}
 			content := parts[1]
@@ -100,7 +102,7 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 				"UPDATE chunks SET content=$1, embedding=NULL, processed_at=NULL WHERE id=$2",
 				content, id,
 			)
-			bot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Обновлён фрагмент %d", id)))
+			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Обновлён фрагмент %d", id)))
 
 		default:
 			content := strings.Trim(text, " ")
@@ -108,7 +110,13 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 				"INSERT INTO chunks(content) VALUES($1)",
 				content,
 			)
-			bot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
+			adminBot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
 		}
+	}
+}
+
+func SendToAllAdmins(message string) {
+	for adminChatID := range adminChats {
+		adminBot.Send(tgbotapi.NewMessage(int64(adminChatID), message))
 	}
 }
