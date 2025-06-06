@@ -11,6 +11,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
+	"ragbot/internal/amo"
 	"ragbot/internal/handler" // поправлен импорт
 	"ragbot/internal/util"
 )
@@ -96,6 +97,13 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 				delete(contactSteps, chatID)
 				stateMu.Unlock()
 				reply(chatID, "Наш менеджер свяжется с вами в ближайшее время")
+				info, err := conversation.GetChatInfoByChatID(db, chatID)
+				if err == nil {
+					link := fmt.Sprintf("%s/chat/%s", config.Config.BaseURL, info.ID)
+					adminMsg := fmt.Sprintf("%s (%s): %s\n\n%s", info.Name.String, info.Phone.String, info.Summary.String, link)
+					SendToAllAdmins(adminMsg)
+					amo.SendLead(config.Config.AmoWebhookURL, info.Name.String, info.Phone.String, info.Summary.String+"\n\n"+link)
+				}
 				continue
 			}
 		}
