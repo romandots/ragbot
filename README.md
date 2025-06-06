@@ -12,7 +12,8 @@
 - EDUCATION_FILE_PATH (optional path to file with knowledge source)
 - YANDEX_YML_URL (optional link to yandex.yml file)
 - USE_EXTERNAL_SOURCE (set to "true" to enable external DB source)
-- AMO_WEBHOOK_URL (optional link to amoCRM incoming webhook)
+- AMO_DOMAIN (domain like `example.amocrm.ru`)
+- AMO_ACCESS_TOKEN (OAuth access token for amoCRM API)
 
 ## Установка
 
@@ -37,7 +38,8 @@
    EDUCATION_FILE_PATH=path_to_optional_file
   YANDEX_YML_URL=https://example.com/yandex.yml
   USE_EXTERNAL_SOURCE=true
-  AMO_WEBHOOK_URL=https://example.amocrm.ru/api/v2/pipeline/webhook/123/456
+  AMO_DOMAIN=example.amocrm.ru
+  AMO_ACCESS_TOKEN=your_access_token
   ```
 
 ## Запуск
