@@ -52,7 +52,9 @@ func (f *FileSource) process(db *sql.DB) {
 		if line == "" {
 			continue
 		}
-		_, err := db.ExecContext(context.Background(), "INSERT INTO chunks(content) VALUES($1)", line)
+		_, err := db.ExecContext(context.Background(),
+			"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING",
+			line, f.Path)
 		if err != nil {
 			log.Printf("file source insert error: %v", err)
 		}
