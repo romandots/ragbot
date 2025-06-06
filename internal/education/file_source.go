@@ -52,13 +52,16 @@ func (f *FileSource) process(db *sql.DB) {
 		if line == "" {
 			continue
 		}
-		_, err := db.ExecContext(context.Background(),
-			"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING",
+		rows, err := db.QueryContext(context.Background(),
+			"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING RETURNING content",
 			line, f.Path)
 		if err != nil {
 			log.Printf("file source insert error: %v", err)
 		}
-		log.Printf("Chunk added: %s\n", line)
+		if rows.Next() {
+			log.Printf("Chunk added: %s\n", line)
+		}
+		rows.Close()
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("file source scan error: %v", err)
