@@ -8,11 +8,13 @@ import (
 
 	"github.com/pgvector/pgvector-go"
 	ai "ragbot/internal/ai"
+	"ragbot/internal/util"
 )
 
 // StartWorker runs a goroutine that periodically embeds unprocessed chunks.
 func StartWorker(db *sql.DB, aiClient *ai.AIClient) {
 	go func() {
+		defer util.Recover("embedding worker")
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()
 		for {
@@ -23,6 +25,7 @@ func StartWorker(db *sql.DB, aiClient *ai.AIClient) {
 }
 
 func process(db *sql.DB, aiClient *ai.AIClient) {
+	defer util.Recover("embedding process")
 	rows, err := db.QueryContext(context.Background(), "SELECT id, content FROM chunks WHERE processed_at IS NULL LIMIT 5")
 	if err != nil {
 		log.Printf("embedding worker query error: %v", err)

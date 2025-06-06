@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"ragbot/internal/ai"
+	"ragbot/internal/util"
 )
 
 // QueryRequest/Response модели JSON для эндпоинта /query
@@ -20,12 +21,14 @@ type QueryResponse struct {
 
 // StartHTTP запускает HTTP-сервер с endpoint-ами /health, /query и /chat/{uuid}
 func StartHTTP(db *sql.DB, aiClient *ai.AIClient) {
+	defer util.Recover("StartHTTP")
 	http.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
 	http.HandleFunc("/query", func(w http.ResponseWriter, r *http.Request) {
+		defer util.Recover("/query handler")
 		var req QueryRequest
 		defer r.Body.Close()
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

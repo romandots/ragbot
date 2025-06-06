@@ -7,8 +7,10 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"ragbot/internal/util"
 )
 
 // StartAdminBot запускает Telegram-бота для администрирования базы знаний.
@@ -17,9 +19,13 @@ import (
 //   - token      : токен административного бота (из ENV)
 //   - allowedIDs : слайс разрешённых chat_id администраторов
 func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
+	defer util.Recover("StartAdminBot")
 	bot, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		log.Fatalf("Admin bot init error: %v", err)
+	for err != nil {
+		log.Printf("Admin bot init error: %v\n", err)
+		time.Sleep(1 * time.Second)
+		log.Println("Trying to connect to Telegram bot API again...")
+		bot, err = tgbotapi.NewBotAPI(token)
 	}
 
 	// Собираем множество разрешённых ChatID

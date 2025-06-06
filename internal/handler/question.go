@@ -9,6 +9,7 @@ import (
 
 	"github.com/pgvector/pgvector-go"
 	"ragbot/internal/ai"
+	"ragbot/internal/util"
 )
 
 // ProcessQuestionWithHistory собирает историю, фрагменты из chunks и формирует единый prompt.
@@ -18,6 +19,7 @@ func ProcessQuestionWithHistory(
 	chatID int64,
 	question string,
 ) (string, error) {
+	defer util.Recover("ProcessQuestionWithHistory")
 	var histText string
 	if chatID != 0 {
 		// 1) Получаем всю историю сообщений для этого chatID

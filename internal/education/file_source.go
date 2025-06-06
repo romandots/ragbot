@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"ragbot/internal/util"
 )
 
 // FileSource loads chunks from a text file on a schedule.
@@ -21,6 +23,7 @@ func (f *FileSource) Start(ctx context.Context, db *sql.DB) {
 }
 
 func (f *FileSource) run(ctx context.Context, db *sql.DB) {
+	defer util.Recover("FileSource.run")
 	f.process(db)
 	ticker := time.NewTicker(f.Interval)
 	defer ticker.Stop()
@@ -35,6 +38,7 @@ func (f *FileSource) run(ctx context.Context, db *sql.DB) {
 }
 
 func (f *FileSource) process(db *sql.DB) {
+	defer util.Recover("FileSource.process")
 	file, err := os.Open(f.Path)
 	if err != nil {
 		log.Printf("file source open error: %v", err)

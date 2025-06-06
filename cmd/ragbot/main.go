@@ -15,9 +15,11 @@ import (
 	"ragbot/internal/education"
 	"ragbot/internal/embedding"
 	"ragbot/internal/handler"
+	"ragbot/internal/util"
 )
 
 func main() {
+	defer util.Recover("main")
 	cfg := config.LoadConfig()
 
 	// Подключаем БД

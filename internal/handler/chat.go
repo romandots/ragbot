@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"ragbot/internal/conversation"
+	"ragbot/internal/util"
 )
 
 var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
@@ -51,6 +52,7 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
 
 func ChatHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		defer util.Recover("ChatHandler")
 		uuid := strings.TrimPrefix(r.URL.Path, "/chat/")
 		info, err := conversation.GetChatInfoByUUID(db, uuid)
 		if err != nil {

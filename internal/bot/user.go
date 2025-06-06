@@ -6,12 +6,14 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"ragbot/internal/conversation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
 	"ragbot/internal/handler" // поправлен импорт
+	"ragbot/internal/util"
 )
 
 type contactState struct {
@@ -30,9 +32,13 @@ var (
 //   - aiClient : экземпляр AIClient для генерации ответов
 //   - token    : токен пользовательского бота (из ENV)
 func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
+	defer util.Recover("StartUserBot")
 	bot, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		log.Fatalf("User bot init error: %v", err)
+	for err != nil {
+		log.Printf("User bot init error: %v\n", err)
+		time.Sleep(1 * time.Second)
+		log.Println("Trying to connect to Telegram bot API again...")
+		bot, err = tgbotapi.NewBotAPI(token)
 	}
 
 	u := tgbotapi.NewUpdate(0)
