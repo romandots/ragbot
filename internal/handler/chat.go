@@ -14,13 +14,22 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <script src="https://cdn.tailwindcss.com"></script>
-<title>Chat</title>
+<title>Чат с {{.Name}}</title>
 </head>
 <body class="bg-gray-100">
 <div class="max-w-2xl mx-auto p-4">
+    {{if .Name}}
+    <div class="bg-yellow-100 p-3 rounded shadow mb-4">
+        <h2 class="font-bold mb-2">Контакт</h2>
+        <p>{{.Name}}</p>
+		{{if .Phone}}
+		<p>{{.Phone}}</p>
+		{{end}}
+    </div>
+    {{end}}
     {{if .Summary}}
     <div class="bg-yellow-100 p-3 rounded shadow mb-4">
-        <h2 class="font-bold mb-2">Summary</h2>
+        <h2 class="font-bold mb-2">Суть обращения</h2>
         <p>{{.Summary}}</p>
     </div>
     {{end}}
@@ -28,9 +37,9 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
         {{range .History}}
         <div class="mb-2">
             {{if eq .Role "user"}}
-            <span class="font-semibold">User:</span>
+            <span class="font-semibold">{{.Name}}:</span>
             {{else}}
-            <span class="text-blue-600">Assistant:</span>
+            <span class="text-blue-600">Ассистент:</span>
             {{end}}
             <span>{{.Content}}</span>
         </div>
@@ -51,9 +60,13 @@ func ChatHandler(db *sql.DB) http.HandlerFunc {
 		history := conversation.GetFullHistory(db, info.ChatID)
 		data := struct {
 			Summary string
+			Name    string
+			Phone   string
 			History []conversation.HistoryItem
 		}{
 			Summary: info.Summary.String,
+			Name:    info.Name.String,
+			Phone:   info.Phone.String,
 			History: history,
 		}
 		chatTemplate.Execute(w, data)
