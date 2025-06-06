@@ -84,7 +84,7 @@ func LoadConfig() *AppConfig {
 		}
 	}
 
-	Config := &AppConfig{
+	Config = &AppConfig{
 		BaseURL:            baseURL,
 		DatabaseURL:        url,
 		UseLocalModel:      useLocal,
