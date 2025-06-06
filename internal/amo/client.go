@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"ragbot/internal/bot"
 )
 
 // SendLead creates a lead in amoCRM using the API v4.
@@ -112,7 +113,9 @@ func SendLead(domain, accessToken, name, phone, comment string) error {
 	defer resp2.Body.Close()
 	if resp2.StatusCode >= http.StatusBadRequest {
 		data, _ := io.ReadAll(resp2.Body)
-		return fmt.Errorf("amoCRM add note failed: %s: %s", resp2.Status, string(data))
+		err := fmt.Errorf("amoCRM add note failed: %s: %s", resp2.Status, string(data))
+		bot.SendToAllAdmins(err.Error())
+		return err
 	}
 	return nil
 }
