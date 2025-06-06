@@ -18,6 +18,7 @@ type AppConfig struct {
 	EducationFilePath  string
 	UseExternalSource  bool
 	YandexYMLURL       string
+	AmoWebhookURL      string
 }
 
 type AppSettings struct {
@@ -66,6 +67,7 @@ func LoadConfig() *AppConfig {
 
 	eduFile := os.Getenv("EDUCATION_FILE_PATH")
 	ymlURL := os.Getenv("YANDEX_YML_URL")
+	amoURL := os.Getenv("AMO_WEBHOOK_URL")
 	useExternal := false
 	if os.Getenv("USE_EXTERNAL_SOURCE") == "true" {
 		useExternal = true
@@ -95,6 +97,7 @@ func LoadConfig() *AppConfig {
 		EducationFilePath:  eduFile,
 		UseExternalSource:  useExternal,
 		YandexYMLURL:       ymlURL,
+		AmoWebhookURL:      amoURL,
 	}
 
 	return Config
