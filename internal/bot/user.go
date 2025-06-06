@@ -102,7 +102,7 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 					link := fmt.Sprintf("%s/chat/%s", config.Config.BaseURL, info.ID)
 					adminMsg := fmt.Sprintf("%s (%s): %s\n\n%s", info.Name.String, info.Phone.String, info.Summary.String, link)
 					SendToAllAdmins(adminMsg)
-					amo.SendLead(config.Config.AmoDomain, config.Config.AmoAccessToken, info.Name.String, info.Phone.String, info.Summary.String+"\n\n"+link)
+					amo.SendLead(info.Name.String, info.Phone.String, info.Summary.String+"\n\n"+link)
 				}
 				continue
 			}
