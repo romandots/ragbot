@@ -7,8 +7,10 @@
 - Docker и Docker Compose
 - Переменные окружения:
   - USER_TELEGRAM_TOKEN
-  - ADMIN_TELEGRAM_TOKEN
-  - ADMIN_CHAT_IDS
+- ADMIN_TELEGRAM_TOKEN
+- ADMIN_CHAT_IDS
+- EDU_FILE_PATH (optional path to file with knowledge source)
+- USE_EXTERNAL_SOURCE (set to "true" to enable external DB source)
 
 ## Установка
 
@@ -28,9 +30,11 @@
    ```env
    MODEL_PATH=path_to_your_model/model.gguf
    USER_TELEGRAM_TOKEN=your_user_telegram_token
-   ADMIN_TELEGRAM_TOKEN=your_admin_telegram_token
-   ADMIN_CHAT_IDS=your_admin_chat_ids_separated_by_commas
-   ```
+  ADMIN_TELEGRAM_TOKEN=your_admin_telegram_token
+  ADMIN_CHAT_IDS=your_admin_chat_ids_separated_by_commas
+  EDU_FILE_PATH=path_to_optional_file
+  USE_EXTERNAL_SOURCE=true
+  ```
 
 ## Запуск
 
