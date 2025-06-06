@@ -38,7 +38,7 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
         {{range .History}}
         <div class="mb-2">
             {{if eq .Role "user"}}
-            <span class="font-semibold">{{.Name}}:</span>
+            <span class="font-semibold">{{$.Name}}:</span>
             {{else}}
             <span class="text-blue-600">Ассистент:</span>
             {{end}}
@@ -53,7 +53,7 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
 func ChatHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer util.Recover("ChatHandler")
-		uuid := strings.TrimPrefix(r.URL.Path, "/chat/")
+		uuid := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"), "/chat/")
 		info, err := conversation.GetChatInfoByUUID(db, uuid)
 		if err != nil {
 			http.NotFound(w, r)
