@@ -17,6 +17,7 @@ type AppConfig struct {
 	AdminChatIDs       []int64
 	EducationFilePath  string
 	UseExternalSource  bool
+	YandexYMLURL       string
 }
 
 type AppSettings struct {
@@ -63,6 +64,7 @@ func LoadConfig() *AppConfig {
 	}
 
 	eduFile := os.Getenv("EDUCATION_FILE_PATH")
+	ymlURL := os.Getenv("YANDEX_YML_URL")
 	useExternal := false
 	if os.Getenv("USE_EXTERNAL_SOURCE") == "true" {
 		useExternal = true
@@ -91,6 +93,7 @@ func LoadConfig() *AppConfig {
 		AdminChatIDs:       adminIDs,
 		EducationFilePath:  eduFile,
 		UseExternalSource:  useExternal,
+		YandexYMLURL:       ymlURL,
 	}
 
 	return Config

@@ -45,6 +45,9 @@ func main() {
 	if cfg.EducationFilePath != "" {
 		sources = append(sources, &education.FileSource{Path: cfg.EducationFilePath, Interval: time.Hour})
 	}
+	if cfg.YandexYMLURL != "" {
+		sources = append(sources, &education.YandexYMLSource{URL: cfg.YandexYMLURL, Interval: time.Hour})
+	}
 	if cfg.UseExternalSource {
 		sources = append(sources, &education.ExternalDBSource{})
 	}
