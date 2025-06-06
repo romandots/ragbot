@@ -12,7 +12,7 @@ import (
 	"ragbot/internal/util"
 )
 
-const source = "yandex.yml"
+const yandexSource = "yandex.yml"
 
 type YandexYMLSource struct {
 	URL      string
@@ -100,11 +100,11 @@ func (y *YandexYMLSource) process(db *sql.DB) {
 
 		err := db.QueryRowContext(context.Background(),
 			"SELECT id, created_at FROM chunks WHERE source=$1 AND ext_id=$2",
-			source, extID).Scan(&id, &createdAt)
+			yandexSource, extID).Scan(&id, &createdAt)
 		if err == sql.ErrNoRows {
 			_, err = db.ExecContext(context.Background(),
 				"INSERT INTO chunks(content, source, ext_id, created_at) VALUES($1,$2,$3,$4)",
-				content, source, extID, pubDate)
+				content, yandexSource, extID, pubDate)
 			if err != nil {
 				log.Printf("yandex.yml insert error: %v", err)
 			} else {
