@@ -107,8 +107,9 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 		default:
 			content := strings.Trim(text, " ")
 			_, _ = db.ExecContext(context.Background(),
-				"INSERT INTO chunks(content) VALUES($1)",
+				"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING",
 				content,
+				"admin",
 			)
 			adminBot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
 		}
