@@ -5,12 +5,23 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"ragbot/internal/conversation"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
 	"ragbot/internal/handler" // поправлен импорт
+)
+
+type contactState struct {
+	Stage int // 1 - expect name, 2 - expect phone
+	Name  string
+}
+
+var (
+	stateMu      sync.Mutex
+	contactSteps = make(map[int64]*contactState)
 )
 
 // StartUserBot запускает Telegram-бота для пользователей.
@@ -66,12 +77,13 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 					log.Printf("summary error: %v", err)
 				}
 
-				// Отправляем пользователю подтверждение
-				reply := tgbotapi.NewMessage(chatID, "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
-				bot.Send(reply)
+				stateMu.Lock()
+				contactSteps[chatID] = &contactState{Stage: 1}
+				stateMu.Unlock()
 
-				// Сохраняем в историю ответ
-				conversation.AppendHistory(db, chatID, "assistant", "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
+				msg := tgbotapi.NewMessage(chatID, "Как вас зовут?")
+				bot.Send(msg)
+				conversation.AppendHistory(db, chatID, "assistant", "Как вас зовут?")
 
 				// Если нужно — уведомляем менеджера (в админ-чат или личным сообщением)
 				// Например, пусть менеджер сидит в чате с ID = ADMIN_CHAT_ID
@@ -93,6 +105,36 @@ func StartUserBot(db *sql.DB, aiClient *ai.AIClient, token string) {
 		chatID := update.Message.Chat.ID
 		conversation.EnsureSession(db, chatID)
 		userText := update.Message.Text
+
+		stateMu.Lock()
+		st, ok := contactSteps[chatID]
+		stateMu.Unlock()
+		if ok {
+			switch st.Stage {
+			case 1:
+				conversation.AppendHistory(db, chatID, "user", userText)
+				conversation.UpdateName(db, chatID, userText)
+				stateMu.Lock()
+				st.Stage = 2
+				st.Name = userText
+				stateMu.Unlock()
+				msg := tgbotapi.NewMessage(chatID, "Укажите номер телефона")
+				bot.Send(msg)
+				conversation.AppendHistory(db, chatID, "assistant", "Укажите номер телефона")
+				continue
+			case 2:
+				conversation.AppendHistory(db, chatID, "user", userText)
+				conversation.UpdatePhone(db, chatID, userText)
+				stateMu.Lock()
+				delete(contactSteps, chatID)
+				stateMu.Unlock()
+				msg := tgbotapi.NewMessage(chatID, "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
+				bot.Send(msg)
+				conversation.AppendHistory(db, chatID, "assistant", "Менеджер уже уведомлён и свяжется с вами в ближайшее время.")
+				continue
+			}
+		}
+
 		lower := strings.ToLower(userText)
 
 		// 0) Если пользователь хочет «записаться» — предлагаем кнопку «Вызвать менеджера»
