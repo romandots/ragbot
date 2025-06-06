@@ -48,14 +48,13 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 			conversation.EnsureSession(db, chatID)
 			data := update.CallbackQuery.Data
 
-			// 2.1) Сразу подтверждаем колбек, чтобы Telegram убрал «часики»
-			//     Второй аргумент (text) может быть пустым, т.е. просто «OK»
+			// Сразу подтверждаем колбек, чтобы Telegram убрал «часики»
 			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 			if _, err := userBot.Request(callback); err != nil {
 				log.Printf("Callback answer error: %v", err)
 			}
 
-			// 2.2) В зависимости от data реагируем
+			// В зависимости от data реагируем
 			switch data {
 			case "CALL_MANAGER":
 				callManagerAction(chatID)
@@ -88,7 +87,7 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 				st.Stage = 2
 				st.Name = userText
 				stateMu.Unlock()
-				reply(chatID, "Укажите телефон для связи")
+				reply(chatID, "Напишите ваш телефон для связи")
 				continue
 			case 2:
 				conversation.AppendHistory(db, chatID, "user", userText)
@@ -101,7 +100,7 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 			}
 		}
 
-		// Если пользователь хочет «записаться» — предлагаем кнопку «Вызвать менеджера»
+		// Если пользователь хочет «записаться» — предлагаем кнопку "Хочу, чтобы мне перезвонили"
 		lowerRequest := strings.ToLower(userText)
 		if util.ContainsStringFromSlice(lowerRequest, config.Settings.CallManagerTriggerWords) {
 			conversation.AppendHistory(db, chatID, "user", userText)
@@ -130,7 +129,7 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 }
 
 func callManagerAction(chatID int64) {
-	conversation.AppendHistory(db, chatID, "user", "нажал кнопку Вызвать менеджера")
+	conversation.AppendHistory(db, chatID, "user", "** хочет, чтобы ему перезвонили **")
 
 	summary, err := summarize(db, aiClient, chatID)
 	if err == nil {
@@ -182,10 +181,10 @@ func reply(chatID int64, message string) {
 func callMeBackButton(chatID int64) tgbotapi.MessageConfig {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Позвать менеджера в чат", "CALL_MANAGER"),
+			tgbotapi.NewInlineKeyboardButtonData("Хочу, чтобы мне перезвонили", "CALL_MANAGER"),
 		),
 	)
-	msg := tgbotapi.NewMessage(chatID, "Если вы хотите записаться на занятие, нажмите кнопку:")
+	msg := tgbotapi.NewMessage(chatID, "Чтобы продолжить общение с нашим менеджером, нажмите кнопку:")
 	msg.ReplyMarkup = keyboard
 	return msg
 }
