@@ -62,7 +62,7 @@ func LoadConfig() *AppConfig {
 		log.Fatalln("ADMIN_TELEGRAM_TOKEN not set")
 	}
 
-	eduFile := os.Getenv("EDU_FILE_PATH")
+	eduFile := os.Getenv("EDUCATION_FILE_PATH")
 	useExternal := false
 	if os.Getenv("USE_EXTERNAL_SOURCE") == "true" {
 		useExternal = true

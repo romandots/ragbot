@@ -56,6 +56,7 @@ func (f *FileSource) process(db *sql.DB) {
 		if err != nil {
 			log.Printf("file source insert error: %v", err)
 		}
+		log.Printf("Chunk added: %s\n", line)
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("file source scan error: %v", err)
