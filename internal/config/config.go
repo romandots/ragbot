@@ -21,8 +21,9 @@ type AppConfig struct {
 }
 
 type AppSettings struct {
-	Preamble                string
-	CallManagerTriggerWords []string
+	Preamble                        string
+	CallManagerTriggerWords         []string
+	CallManagerTriggerWordsInAnswer []string
 }
 
 var Config *AppConfig
@@ -109,9 +110,15 @@ func LoadSettings() *AppSettings {
 		callManagerTriggerWords = "записаться,позвать,позови,менеджер,оператор"
 	}
 
+	callManagerTriggerWordsInAnswer := os.Getenv("CALL_MANAGER_TRIGGER_WORDS")
+	if callManagerTriggerWordsInAnswer == "" {
+		callManagerTriggerWordsInAnswer = "заказать звонок,позвать менеджера,вам перезвонил"
+	}
+
 	Settings = &AppSettings{
-		Preamble:                os.Getenv("PREAMBLE"),
-		CallManagerTriggerWords: strings.Split(callManagerTriggerWords, ","),
+		Preamble:                        os.Getenv("PREAMBLE"),
+		CallManagerTriggerWords:         strings.Split(callManagerTriggerWords, ","),
+		CallManagerTriggerWordsInAnswer: strings.Split(callManagerTriggerWordsInAnswer, ","),
 	}
 
 	return Settings
