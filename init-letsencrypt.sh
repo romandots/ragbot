@@ -2,7 +2,9 @@
 
 # Загрузить переменные из .env файла
 if [ -f .env ]; then
-  export $(grep -v '^#' .env | xargs)
+  set -a
+  source .env
+  set +a
 fi
 
 domains=($DOMAIN_NAME)
