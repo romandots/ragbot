@@ -12,6 +12,8 @@ import (
 	"ragbot/internal/util"
 )
 
+const fileSource = "file"
+
 // FileSource loads chunks from a text file on a schedule.
 type FileSource struct {
 	Path     string
@@ -54,7 +56,7 @@ func (f *FileSource) process(db *sql.DB) {
 		}
 		rows, err := db.QueryContext(context.Background(),
 			"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING RETURNING content",
-			line, f.Path)
+			line, fileSource)
 		if err != nil {
 			log.Printf("file source insert error: %v", err)
 		}

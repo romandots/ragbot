@@ -1,20 +1,23 @@
 package ai
 
-import "os"
+import (
+	"ragbot/internal/config"
+)
 
-// AIClient обёртка над ModelStrategy
+type ModelStrategy interface {
+	GenerateEmbedding(text string) ([]float32, error)
+	GenerateResponse(prompt string) (string, error)
+}
+
 type AIClient struct {
 	strategy ModelStrategy
 }
 
-// NewAIClient создаёт AIClient на основе переменных окружения
 func NewAIClient() *AIClient {
-	// useLocal берётся из ENV
-	if os.Getenv("USE_LOCAL_MODEL") == "true" {
+	if config.Config.UseLocalModel {
 		return &AIClient{strategy: NewLocalStrategy()}
 	}
-	apiKey := os.Getenv("OPENAI_API_KEY")
-	return &AIClient{strategy: NewGPTStrategy(apiKey)}
+	return &AIClient{strategy: NewGPTStrategy(config.Config.OpenAIAPIKey)}
 }
 
 func (a *AIClient) GenerateEmbedding(text string) ([]float32, error) {

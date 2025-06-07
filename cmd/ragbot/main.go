@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	_ "database/sql"
+	"database/sql"
 	"log"
 	"time"
 
@@ -22,22 +22,33 @@ func main() {
 	defer util.Recover("main")
 	cfg := config.LoadConfig()
 
-	// Подключаем БД
+	// Connect to DB
 	database, err := db.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("DB connection error: %v", err)
 	}
 	defer database.Close()
 
-	// Создаём AIClient (по стратегии)
-	aiClient := ai.NewAIClient() // берёт USE_LOCAL_MODEL, OPENAI_API_KEY из env
+	// Init AI client
+	aiClient := ai.NewAIClient()
 
-	// Запускаем HTTP-сервер
+	// Start web server
 	go handler.StartHTTP(database, aiClient)
 
-	// Запускаем Telegram-бот и источники данных
+	// Start user bot
 	go bot.StartUserBot(database, aiClient, cfg.UserTelegramToken)
 
+	// Start education sources
+	startEducationSourcesHandlers(cfg, database)
+
+	// Start embedding worker
+	embedding.StartWorker(database, aiClient)
+
+	// Block the main goroutine
+	select {}
+}
+
+func startEducationSourcesHandlers(cfg *config.AppConfig, database *sql.DB) {
 	ctx := context.Background()
 	sources := []education.Source{
 		&education.AdminSource{Token: cfg.AdminTelegramToken, AllowedIDs: cfg.AdminChatIDs},
@@ -54,8 +65,4 @@ func main() {
 	for _, s := range sources {
 		s.Start(ctx, database)
 	}
-
-	embedding.StartWorker(database, aiClient)
-
-	select {} // блокируем main
 }

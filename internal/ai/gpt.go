@@ -3,15 +3,8 @@ package ai
 import (
 	"context"
 	"fmt"
-
 	go_openai "github.com/sashabaranov/go-openai"
 )
-
-// ModelStrategy определяет интерфейс для стратегии эмбеддинга и генерации
-type ModelStrategy interface {
-	GenerateEmbedding(text string) ([]float32, error)
-	GenerateResponse(prompt string) (string, error)
-}
 
 // GPTStrategy использует OpenAI API
 type GPTStrategy struct {
@@ -46,18 +39,4 @@ func (g *GPTStrategy) GenerateResponse(prompt string) (string, error) {
 		return "", fmt.Errorf("OpenAI chat error: %v", err)
 	}
 	return resp.Choices[0].Message.Content, nil
-}
-
-// LocalStrategy заглушка локальной LLaMA стратегии
-// TODO: интегрировать llama.cpp или другую локальную модель
-type LocalStrategy struct{}
-
-func NewLocalStrategy() *LocalStrategy { return &LocalStrategy{} }
-
-func (l *LocalStrategy) GenerateEmbedding(text string) ([]float32, error) {
-	return nil, fmt.Errorf("local embedding not implemented")
-}
-
-func (l *LocalStrategy) GenerateResponse(prompt string) (string, error) {
-	return "", fmt.Errorf("local generation not implemented")
 }

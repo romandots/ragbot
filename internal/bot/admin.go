@@ -11,6 +11,8 @@ import (
 	"strings"
 )
 
+const source = "admin"
+
 func init() {
 	//sync.Once{}
 }
@@ -109,7 +111,7 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 			_, _ = db.ExecContext(context.Background(),
 				"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING",
 				content,
-				"admin",
+				source,
 			)
 			adminBot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
 		}
