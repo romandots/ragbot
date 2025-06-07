@@ -8,18 +8,19 @@ import (
 )
 
 type AppConfig struct {
-	BaseURL            string
-	DatabaseURL        string
-	UseLocalModel      bool
-	OpenAIAPIKey       string
-	UserTelegramToken  string
-	AdminTelegramToken string
-	AdminChatIDs       []int64
-	EducationFilePath  string
-	UseExternalSource  bool
-	YandexYMLURL       string
-	AmoDomain          string
-	AmoAccessToken     string
+	BaseURL             string
+	DatabaseURL         string
+	UseLocalModel       bool
+	OpenAIAPIKey        string
+	UserTelegramToken   string
+	UserTelegramBotName string
+	AdminTelegramToken  string
+	AdminChatIDs        []int64
+	EducationFilePath   string
+	UseExternalSource   bool
+	YandexYMLURL        string
+	AmoDomain           string
+	AmoAccessToken      string
 }
 
 type AppSettings struct {
@@ -61,6 +62,8 @@ func LoadConfig() *AppConfig {
 		log.Fatalln("USER_TELEGRAM_TOKEN not set")
 	}
 
+	userBotName := os.Getenv("USER_TELEGRAM_BOT_NAME")
+
 	adminToken := os.Getenv("ADMIN_TELEGRAM_TOKEN")
 	if adminToken == "" {
 		log.Fatalln("ADMIN_TELEGRAM_TOKEN not set")
@@ -89,18 +92,19 @@ func LoadConfig() *AppConfig {
 	}
 
 	Config = &AppConfig{
-		BaseURL:            baseURL,
-		DatabaseURL:        url,
-		UseLocalModel:      useLocal,
-		OpenAIAPIKey:       apiKey,
-		UserTelegramToken:  userToken,
-		AdminTelegramToken: adminToken,
-		AdminChatIDs:       adminIDs,
-		EducationFilePath:  eduFile,
-		UseExternalSource:  useExternal,
-		YandexYMLURL:       ymlURL,
-		AmoDomain:          amoDomain,
-		AmoAccessToken:     amoToken,
+		BaseURL:             baseURL,
+		DatabaseURL:         url,
+		UseLocalModel:       useLocal,
+		OpenAIAPIKey:        apiKey,
+		UserTelegramToken:   userToken,
+		UserTelegramBotName: userBotName,
+		AdminTelegramToken:  adminToken,
+		AdminChatIDs:        adminIDs,
+		EducationFilePath:   eduFile,
+		UseExternalSource:   useExternal,
+		YandexYMLURL:        ymlURL,
+		AmoDomain:           amoDomain,
+		AmoAccessToken:      amoToken,
 	}
 
 	return Config

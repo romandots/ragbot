@@ -15,6 +15,10 @@ type Repository struct {
 
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
+func (r *Repository) Ping(ctx context.Context) error {
+	return r.db.PingContext(ctx)
+}
+
 // --- chunk operations ---
 
 // AddChunk inserts a new chunk. It returns true if the row was inserted.
