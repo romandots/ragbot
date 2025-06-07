@@ -21,6 +21,7 @@ import (
 func main() {
 	defer util.Recover("main")
 	cfg := config.LoadConfig()
+	config.LoadSettings()
 
 	// Connect to DB
 	database, err := db.Connect(cfg.DatabaseURL)
