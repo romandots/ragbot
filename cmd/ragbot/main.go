@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"ragbot/internal/education"
 	"ragbot/internal/embedding"
 	"ragbot/internal/handler"
+	"ragbot/internal/repository"
 	"ragbot/internal/util"
 )
 
@@ -23,33 +23,27 @@ func main() {
 	cfg := config.LoadConfig()
 	config.LoadSettings()
 
-	// Connect to DB
 	database, err := db.Connect(cfg.DatabaseURL)
 	if err != nil {
 		log.Fatalf("DB connection error: %v", err)
 	}
 	defer database.Close()
+	repo := repository.New(database)
 
-	// Init AI client
 	aiClient := ai.NewAIClient()
 
-	// Start web server
-	go handler.StartHTTP(database, aiClient)
+	go handler.StartHTTP(repo, aiClient)
 
-	// Start user bot
-	go bot.StartUserBot(database, aiClient, cfg.UserTelegramToken)
+	go bot.StartUserBot(repo, aiClient, cfg.UserTelegramToken)
 
-	// Start education sources
-	startEducationSourcesHandlers(cfg, database)
+	startEducationSourcesHandlers(cfg, repo)
 
-	// Start embedding worker
-	embedding.StartWorker(database, aiClient)
+	embedding.StartWorker(repo, aiClient)
 
-	// Block the main goroutine
 	select {}
 }
 
-func startEducationSourcesHandlers(cfg *config.AppConfig, database *sql.DB) {
+func startEducationSourcesHandlers(cfg *config.AppConfig, repo *repository.Repository) {
 	ctx := context.Background()
 	sources := []education.Source{
 		&education.AdminSource{Token: cfg.AdminTelegramToken, AllowedIDs: cfg.AdminChatIDs},
@@ -64,6 +58,6 @@ func startEducationSourcesHandlers(cfg *config.AppConfig, database *sql.DB) {
 		sources = append(sources, &education.ExternalDBSource{})
 	}
 	for _, s := range sources {
-		s.Start(ctx, database)
+		s.Start(ctx, repo)
 	}
 }
