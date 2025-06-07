@@ -3,12 +3,12 @@ package education
 import (
 	"bufio"
 	"context"
-	"database/sql"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"ragbot/internal/repository"
 	"ragbot/internal/util"
 )
 
@@ -20,13 +20,13 @@ type FileSource struct {
 	Interval time.Duration
 }
 
-func (f *FileSource) Start(ctx context.Context, db *sql.DB) {
-	go f.run(ctx, db)
+func (f *FileSource) Start(ctx context.Context, repo *repository.Repository) {
+	go f.run(ctx, repo)
 }
 
-func (f *FileSource) run(ctx context.Context, db *sql.DB) {
+func (f *FileSource) run(ctx context.Context, repo *repository.Repository) {
 	defer util.Recover("FileSource.run")
-	f.process(db)
+	f.process(repo)
 	ticker := time.NewTicker(f.Interval)
 	defer ticker.Stop()
 	for {
@@ -34,12 +34,12 @@ func (f *FileSource) run(ctx context.Context, db *sql.DB) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			f.process(db)
+			f.process(repo)
 		}
 	}
 }
 
-func (f *FileSource) process(db *sql.DB) {
+func (f *FileSource) process(repo *repository.Repository) {
 	defer util.Recover("FileSource.process")
 	file, err := os.Open(f.Path)
 	if err != nil {
@@ -54,16 +54,14 @@ func (f *FileSource) process(db *sql.DB) {
 		if line == "" {
 			continue
 		}
-		rows, err := db.QueryContext(context.Background(),
-			"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING RETURNING content",
-			line, fileSource)
+		added, err := repo.AddChunk(context.Background(), line, fileSource)
 		if err != nil {
 			log.Printf("file source insert error: %v", err)
+			continue
 		}
-		if rows.Next() {
-			log.Printf("Chunk added: %s\n", line)
+		if added {
+			log.Printf("Chunk added: %s", line)
 		}
-		rows.Close()
 	}
 	if err := scanner.Err(); err != nil {
 		log.Printf("file source scan error: %v", err)

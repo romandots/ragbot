@@ -2,8 +2,9 @@ package education
 
 import (
 	"context"
-	"database/sql"
+
 	"ragbot/internal/bot"
+	"ragbot/internal/repository"
 )
 
 // AdminSource wraps the admin Telegram bot as a knowledge source.
@@ -12,7 +13,6 @@ type AdminSource struct {
 	AllowedIDs []int64
 }
 
-func (a *AdminSource) Start(ctx context.Context, db *sql.DB) {
-	// bot.StartAdminBot blocks, so run it in a goroutine
-	go bot.StartAdminBot(db, a.Token, a.AllowedIDs)
+func (a *AdminSource) Start(ctx context.Context, repo *repository.Repository) {
+	go bot.StartAdminBot(repo, a.Token, a.AllowedIDs)
 }

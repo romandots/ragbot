@@ -2,36 +2,28 @@ package bot
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"log"
-	"ragbot/internal/util"
 	"strconv"
 	"strings"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"ragbot/internal/repository"
+	"ragbot/internal/util"
 )
 
 const source = "admin"
 
-func init() {
-	//sync.Once{}
-}
-
 var adminChats []int64
 var adminBot *tgbotapi.BotAPI
 
-// StartAdminBot запускает Telegram-бота для администрирования базы знаний.
-// Параметры:
-//   - db         : указатель на SQL-соединение
-//   - token      : токен административного бота (из ENV)
-//   - allowedIDs : слайс разрешённых chat_id администраторов
-func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
+// StartAdminBot launches Telegram bot for knowledge base administration.
+func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64) {
 	defer util.Recover("StartAdminBot")
 
 	adminBot = connect(token)
 	log.Println("Admin bot connected to Telegram API")
 
-	// Собираем множество разрешённых ChatID
 	adminChats = allowedIDs
 	allowed := make(map[int64]bool)
 	for _, id := range allowedIDs {
@@ -50,76 +42,81 @@ func StartAdminBot(db *sql.DB, token string, allowedIDs []int64) {
 		chatID := update.Message.Chat.ID
 		text := strings.TrimSpace(update.Message.Text)
 
-		// Команда /myid доступна всем пользователям
 		if text == "/myid" {
-			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Your chat_id is: %d", chatID)))
+			replyToAdmin(chatID, fmt.Sprintf("Ваш CHAT ID: %d", chatID))
 			continue
 		}
 
-		// /help
 		if strings.HasPrefix(text, "/help") {
-			adminBot.Send(tgbotapi.NewMessage(chatID,
+			replyToAdmin(chatID,
 				"Команды администратора:\n"+
 					"/help — эта справка\n"+
 					"/myid — получить свой chat_id\n"+
 					"/delete <id> — удалить фрагмент по ID\n"+
 					"/update <id> <текст> — обновить фрагмент по ID\n\n"+
-					"Все остальное будет интерпретировано как запись в базу знаний"))
+					"Все остальное будет интерпретировано как запись в базу знаний")
 			continue
 		}
 
-		// Все остальные команды должны выполняться только админами
 		if !allowed[chatID] {
 			continue
 		}
 
 		switch {
-		// /delete <id> — удалить фрагмент по id
 		case strings.HasPrefix(text, "/delete "):
 			idStr := strings.TrimPrefix(text, "/delete ")
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
+				replyToAdmin(chatID, "Неверный ID")
 				continue
 			}
-			_, _ = db.ExecContext(context.Background(),
-				"DELETE FROM chunks WHERE id = $1", id,
-			)
-			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Удалён фрагмент %d", id)))
+			if err := repo.DeleteChunk(context.Background(), id); err != nil {
+				replyToAdmin(chatID, "Ошибка удаления")
+				continue
+			}
+			replyToAdmin(chatID, fmt.Sprintf("Удалён фрагмент %d", id))
 
-		// /update <id> <новый текст> — обновить существующий фрагмент
 		case strings.HasPrefix(text, "/update "):
 			parts := strings.SplitN(strings.TrimPrefix(text, "/update "), " ", 2)
 			if len(parts) < 2 {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Использование: /update <id> <новый текст>"))
+				replyToAdmin(chatID, "Использование: /update <id> <новый текст>")
 				continue
 			}
 			id, err := strconv.Atoi(parts[0])
 			if err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
+				replyToAdmin(chatID, "Неверный ID")
 				continue
 			}
 			content := parts[1]
-			_, _ = db.ExecContext(context.Background(),
-				"UPDATE chunks SET content=$1, embedding=NULL, processed_at=NULL WHERE id=$2",
-				content, id,
-			)
-			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Обновлён фрагмент %d", id)))
+			if err := repo.UpdateChunk(context.Background(), id, content); err != nil {
+				replyToAdmin(chatID, "Ошибка обновления")
+				continue
+			}
+			replyToAdmin(chatID, fmt.Sprintf("Обновлён фрагмент %d", id))
 
 		default:
 			content := strings.Trim(text, " ")
-			_, _ = db.ExecContext(context.Background(),
-				"INSERT INTO chunks(content, source) VALUES($1, $2) ON CONFLICT (content) DO NOTHING",
-				content,
-				source,
-			)
-			adminBot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
+			added, err := repo.AddChunk(context.Background(), content, source)
+			if err != nil {
+				replyToAdmin(chatID, "Ошибка добавления")
+				continue
+			}
+			if added {
+				replyToAdmin(chatID, "Добавлено")
+			} else {
+				replyToAdmin(chatID, "Уже существует")
+			}
 		}
 	}
 }
 
 func SendToAllAdmins(message string) {
-	for adminChatID := range adminChats {
-		adminBot.Send(tgbotapi.NewMessage(int64(adminChatID), message))
+	for _, adminChatID := range adminChats {
+		replyToAdmin(adminChatID, message)
 	}
+}
+
+func replyToAdmin(chatID int64, message string) {
+	msg := tgbotapi.NewMessage(chatID, message)
+	adminBot.Send(msg)
 }
