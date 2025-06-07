@@ -1,22 +1,22 @@
 package bot
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
-	"ragbot/internal/config"
-	"ragbot/internal/conversation"
 	"strings"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
-	"ragbot/internal/handler" // поправлен импорт
+	"ragbot/internal/config"
+	"ragbot/internal/conversation"
+	"ragbot/internal/handler"
+	"ragbot/internal/repository"
 	"ragbot/internal/util"
 )
 
 type contactState struct {
-	Stage int // 1 - expect name, 2 - expect phone
+	Stage int
 	Name  string
 }
 
@@ -24,16 +24,16 @@ var (
 	stateMu      sync.Mutex
 	contactSteps = make(map[int64]*contactState)
 	userBot      *tgbotapi.BotAPI
-	db           *sql.DB
+	repo         *repository.Repository
 	aiClient     *ai.AIClient
 )
 
-// StartUserBot запускает Telegram-бота для пользователей.
-func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
+// StartUserBot launches Telegram bot for users.
+func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string) {
 	defer util.Recover("StartUserBot")
 
 	aiClient = AIClient
-	db = dbConn
+	repo = r
 	userBot = connect(token)
 	log.Println("User bot connected to Telegram API")
 
@@ -45,23 +45,16 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 	for update := range updates {
 		if update.CallbackQuery != nil {
 			chatID := update.CallbackQuery.Message.Chat.ID
-			conversation.EnsureSession(db, chatID)
+			conversation.EnsureSession(repo, chatID)
 			data := update.CallbackQuery.Data
-
-			// Сразу подтверждаем колбек, чтобы Telegram убрал «часики»
 			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 			if _, err := userBot.Request(callback); err != nil {
 				log.Printf("Callback answer error: %v", err)
 			}
-
-			// В зависимости от data реагируем
 			switch data {
 			case "CALL_MANAGER":
 				callManagerAction(chatID)
-
-			// При необходимости можно добавить другие data-коды
 			default:
-				// Если неожиданный код, просто ничего не делаем или логируем
 				log.Printf("Unknown CallbackQuery data: %s", data)
 			}
 			continue
@@ -72,7 +65,7 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 		}
 
 		chatID := update.Message.Chat.ID
-		conversation.EnsureSession(db, chatID)
+		conversation.EnsureSession(repo, chatID)
 		userText := update.Message.Text
 
 		stateMu.Lock()
@@ -81,8 +74,8 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 		if ok {
 			switch st.Stage {
 			case 1:
-				conversation.AppendHistory(db, chatID, "user", userText)
-				conversation.UpdateName(db, chatID, userText)
+				conversation.AppendHistory(repo, chatID, "user", userText)
+				conversation.UpdateName(repo, chatID, userText)
 				stateMu.Lock()
 				st.Stage = 2
 				st.Name = userText
@@ -90,8 +83,8 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 				reply(chatID, "Напишите ваш телефон для связи")
 				continue
 			case 2:
-				conversation.AppendHistory(db, chatID, "user", userText)
-				conversation.UpdatePhone(db, chatID, userText)
+				conversation.AppendHistory(repo, chatID, "user", userText)
+				conversation.UpdatePhone(repo, chatID, userText)
 				stateMu.Lock()
 				delete(contactSteps, chatID)
 				stateMu.Unlock()
@@ -100,23 +93,21 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 			}
 		}
 
-		// Если пользователь хочет «записаться» — предлагаем кнопку "Хочу, чтобы мне перезвонили"
 		lowerRequest := strings.ToLower(userText)
 		if util.ContainsStringFromSlice(lowerRequest, config.Settings.CallManagerTriggerWords) {
-			conversation.AppendHistory(db, chatID, "user", userText)
+			conversation.AppendHistory(repo, chatID, "user", userText)
 			userBot.Send(callMeBackButton(chatID))
 			continue
 		}
 
-		// Вызываем обработку вопроса (RAG + учёт истории)
-		answer, err := handler.ProcessQuestionWithHistory(db, aiClient, chatID, userText)
+		answer, err := handler.ProcessQuestionWithHistory(repo, aiClient, chatID, userText)
 		if err != nil {
 			SendToAllAdmins(fmt.Sprintf("Возникла ошибка: %s", err))
 			answer = "Возникла ошибка. Пожалуйста, попробуйте повторить ваш запрос позднее."
 		}
 
-		conversation.AppendHistory(db, chatID, "user", userText)
-		conversation.AppendHistory(db, chatID, "assistant", answer)
+		conversation.AppendHistory(repo, chatID, "user", userText)
+		conversation.AppendHistory(repo, chatID, "assistant", answer)
 
 		lowerAnswer := strings.ToLower(answer)
 		if util.ContainsStringFromSlice(lowerAnswer, config.Settings.CallManagerTriggerWordsInAnswer) {
@@ -129,11 +120,11 @@ func StartUserBot(dbConn *sql.DB, AIClient *ai.AIClient, token string) {
 }
 
 func callManagerAction(chatID int64) {
-	conversation.AppendHistory(db, chatID, "user", "** хочет, чтобы ему перезвонили **")
+	conversation.AppendHistory(repo, chatID, "user", "** хочет, чтобы ему перезвонили **")
 
-	summary, err := summarize(db, aiClient, chatID)
+	summary, err := summarize(repo, aiClient, chatID)
 	if err == nil {
-		conversation.UpdateSummary(db, chatID, summary)
+		conversation.UpdateSummary(repo, chatID, summary)
 	} else {
 		log.Printf("summary error: %v", err)
 	}
@@ -144,8 +135,7 @@ func callManagerAction(chatID int64) {
 
 	reply(chatID, "Как к вам можно обращаться?")
 
-	// Уведомляем администраторов
-	info, err := conversation.GetChatInfoByChatID(db, chatID)
+	info, err := conversation.GetChatInfoByChatID(repo, chatID)
 	if err != nil {
 		log.Printf("Разговор не найден")
 		return
@@ -156,9 +146,8 @@ func callManagerAction(chatID int64) {
 	SendToAllAdmins(adminMsg)
 }
 
-func summarize(db *sql.DB, aiClient *ai.AIClient, chatID int64) (string, error) {
-	// Генерируем краткое резюме последних сообщений
-	hist := conversation.GetHistory(db, chatID)
+func summarize(repo *repository.Repository, aiClient *ai.AIClient, chatID int64) (string, error) {
+	hist := conversation.GetHistory(repo, chatID)
 	var sb strings.Builder
 	for _, h := range hist {
 		if h.Role == "user" {
@@ -175,7 +164,7 @@ func summarize(db *sql.DB, aiClient *ai.AIClient, chatID int64) (string, error) 
 func reply(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
 	userBot.Send(msg)
-	conversation.AppendHistory(db, chatID, "assistant", message)
+	conversation.AppendHistory(repo, chatID, "assistant", message)
 }
 
 func callMeBackButton(chatID int64) tgbotapi.MessageConfig {

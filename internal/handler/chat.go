@@ -1,12 +1,12 @@
 package handler
 
 import (
-	"database/sql"
 	"html/template"
 	"net/http"
 	"strings"
 
 	"ragbot/internal/conversation"
+	"ragbot/internal/repository"
 	"ragbot/internal/util"
 )
 
@@ -23,9 +23,9 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
     <div class="bg-yellow-100 p-3 rounded shadow mb-4">
         <h2 class="font-bold mb-2">Контакт</h2>
         <p>{{.Name}}</p>
-		{{if .Phone}}
-		<p>{{.Phone}}</p>
-		{{end}}
+                {{if .Phone}}
+                <p>{{.Phone}}</p>
+                {{end}}
     </div>
     {{end}}
     {{if .Summary}}
@@ -50,16 +50,16 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
 </body>
 </html>`))
 
-func ChatHandler(db *sql.DB) http.HandlerFunc {
+func ChatHandler(repo *repository.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer util.Recover("ChatHandler")
 		uuid := strings.TrimPrefix(strings.TrimSuffix(r.URL.Path, "/"), "/chat/")
-		info, err := conversation.GetChatInfoByUUID(db, uuid)
+		info, err := conversation.GetChatInfoByUUID(repo, uuid)
 		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
-		history := conversation.GetFullHistory(db, info.ChatID)
+		history := conversation.GetFullHistory(repo, info.ChatID)
 		data := struct {
 			Summary string
 			Name    string

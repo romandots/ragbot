@@ -10,9 +10,9 @@ import (
 	"testing"
 
 	"ragbot/internal/conversation"
+	"ragbot/internal/repository"
 )
 
-// memory driver for sql.DB used in tests
 var (
 	memOnce  sync.Once
 	memStore map[int64][]conversation.HistoryItem
@@ -76,7 +76,7 @@ func (r *memRows) Next(dest []driver.Value) error {
 	return nil
 }
 
-func newTestDB(t *testing.T) *sql.DB {
+func newTestRepo(t *testing.T) *repository.Repository {
 	t.Helper()
 	memOnce.Do(func() { sql.Register("mem", memDriver{}) })
 	memMu.Lock()
@@ -86,17 +86,16 @@ func newTestDB(t *testing.T) *sql.DB {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	return db
+	return repository.New(db)
 }
 
 func TestAppendHistoryLimitsToTwenty(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	repo := newTestRepo(t)
 	chatID := int64(1)
 	for i := 0; i < 25; i++ {
-		conversation.AppendHistory(db, chatID, "user", fmt.Sprintf("msg%d", i))
+		conversation.AppendHistory(repo, chatID, "user", fmt.Sprintf("msg%d", i))
 	}
-	history := conversation.GetHistory(db, chatID)
+	history := conversation.GetHistory(repo, chatID)
 	if got := len(history); got != 20 {
 		t.Fatalf("expected history length 20, got %d", got)
 	}
@@ -106,17 +105,16 @@ func TestAppendHistoryLimitsToTwenty(t *testing.T) {
 }
 
 func TestGetHistoryReturnsCopy(t *testing.T) {
-	db := newTestDB(t)
-	defer db.Close()
+	repo := newTestRepo(t)
 	chatID := int64(2)
-	conversation.AppendHistory(db, chatID, "user", "first")
-	conversation.AppendHistory(db, chatID, "assistant", "second")
+	conversation.AppendHistory(repo, chatID, "user", "first")
+	conversation.AppendHistory(repo, chatID, "assistant", "second")
 
-	h1 := conversation.GetHistory(db, chatID)
+	h1 := conversation.GetHistory(repo, chatID)
 	h1[0].Content = "changed"
 	h1 = append(h1, conversation.HistoryItem{Role: "user", Content: "extra"})
 
-	h2 := conversation.GetHistory(db, chatID)
+	h2 := conversation.GetHistory(repo, chatID)
 	if len(h2) != 2 {
 		t.Fatalf("expected history length 2, got %d", len(h2))
 	}
