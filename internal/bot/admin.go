@@ -43,18 +43,18 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 		text := strings.TrimSpace(update.Message.Text)
 
 		if text == "/myid" {
-			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Your chat_id is: %d", chatID)))
+			replyToAdmin(chatID, fmt.Sprintf("Ваш CHAT ID: %d", chatID))
 			continue
 		}
 
 		if strings.HasPrefix(text, "/help") {
-			adminBot.Send(tgbotapi.NewMessage(chatID,
+			replyToAdmin(chatID,
 				"Команды администратора:\n"+
 					"/help — эта справка\n"+
 					"/myid — получить свой chat_id\n"+
 					"/delete <id> — удалить фрагмент по ID\n"+
 					"/update <id> <текст> — обновить фрагмент по ID\n\n"+
-					"Все остальное будет интерпретировано как запись в базу знаний"))
+					"Все остальное будет интерпретировано как запись в базу знаний")
 			continue
 		}
 
@@ -67,44 +67,44 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 			idStr := strings.TrimPrefix(text, "/delete ")
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
+				replyToAdmin(chatID, "Неверный ID")
 				continue
 			}
 			if err := repo.DeleteChunk(context.Background(), id); err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Ошибка удаления"))
+				replyToAdmin(chatID, "Ошибка удаления")
 				continue
 			}
-			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Удалён фрагмент %d", id)))
+			replyToAdmin(chatID, fmt.Sprintf("Удалён фрагмент %d", id))
 
 		case strings.HasPrefix(text, "/update "):
 			parts := strings.SplitN(strings.TrimPrefix(text, "/update "), " ", 2)
 			if len(parts) < 2 {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Использование: /update <id> <новый текст>"))
+				replyToAdmin(chatID, "Использование: /update <id> <новый текст>")
 				continue
 			}
 			id, err := strconv.Atoi(parts[0])
 			if err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Неверный ID"))
+				replyToAdmin(chatID, "Неверный ID")
 				continue
 			}
 			content := parts[1]
 			if err := repo.UpdateChunk(context.Background(), id, content); err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Ошибка обновления"))
+				replyToAdmin(chatID, "Ошибка обновления")
 				continue
 			}
-			adminBot.Send(tgbotapi.NewMessage(chatID, fmt.Sprintf("Обновлён фрагмент %d", id)))
+			replyToAdmin(chatID, fmt.Sprintf("Обновлён фрагмент %d", id))
 
 		default:
 			content := strings.Trim(text, " ")
 			added, err := repo.AddChunk(context.Background(), content, source)
 			if err != nil {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Ошибка добавления"))
+				replyToAdmin(chatID, "Ошибка добавления")
 				continue
 			}
 			if added {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Добавлено"))
+				replyToAdmin(chatID, "Добавлено")
 			} else {
-				adminBot.Send(tgbotapi.NewMessage(chatID, "Уже существует"))
+				replyToAdmin(chatID, "Уже существует")
 			}
 		}
 	}
@@ -112,6 +112,11 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 
 func SendToAllAdmins(message string) {
 	for _, adminChatID := range adminChats {
-		adminBot.Send(tgbotapi.NewMessage(adminChatID, message))
+		replyToAdmin(adminChatID, message)
 	}
+}
+
+func replyToAdmin(chatID int64, message string) {
+	msg := tgbotapi.NewMessage(chatID, message)
+	adminBot.Send(msg)
 }

@@ -80,7 +80,7 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 				st.Stage = 2
 				st.Name = userText
 				stateMu.Unlock()
-				reply(chatID, "Напишите ваш телефон для связи")
+				replyToUser(chatID, "Напишите ваш телефон для связи")
 				continue
 			case 2:
 				conversation.AppendHistory(repo, chatID, "user", userText)
@@ -88,7 +88,7 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 				stateMu.Lock()
 				delete(contactSteps, chatID)
 				stateMu.Unlock()
-				reply(chatID, "Наш менеджер свяжется с вами в ближайшее время")
+				replyToUser(chatID, "Наш менеджер свяжется с вами в ближайшее время")
 				continue
 			}
 		}
@@ -115,7 +115,7 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 			continue
 		}
 
-		reply(chatID, answer)
+		replyToUser(chatID, answer)
 	}
 }
 
@@ -133,7 +133,7 @@ func callManagerAction(chatID int64) {
 	contactSteps[chatID] = &contactState{Stage: 1}
 	stateMu.Unlock()
 
-	reply(chatID, "Как к вам можно обращаться?")
+	replyToUser(chatID, "Как к вам можно обращаться?")
 
 	info, err := conversation.GetChatInfoByChatID(repo, chatID)
 	if err != nil {
@@ -161,7 +161,7 @@ func summarize(repo *repository.Repository, aiClient *ai.AIClient, chatID int64)
 	return summary, err
 }
 
-func reply(chatID int64, message string) {
+func replyToUser(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
 	userBot.Send(msg)
 	conversation.AppendHistory(repo, chatID, "assistant", message)
