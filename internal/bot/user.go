@@ -46,21 +46,7 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 	log.Println("User bot started")
 	for update := range updates {
 		if update.CallbackQuery != nil {
-			chatID := update.CallbackQuery.Message.Chat.ID
-			conversation.EnsureSession(repo, chatID)
-			data := update.CallbackQuery.Data
-			callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
-			if _, err := userBot.Request(callback); err != nil {
-				log.Printf("Callback answer error: %v", err)
-			}
-
-			// Handle actions
-			switch data {
-			case "CALL_MANAGER":
-				callManagerAction(chatID)
-			default:
-				log.Printf("Unknown CallbackQuery data: %s", data)
-			}
+			handleCallbackQuery(update)
 			continue
 		}
 
@@ -68,52 +54,77 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 			continue
 		}
 
-		chatID := update.Message.Chat.ID
-		conversation.EnsureSession(repo, chatID)
-		userText := update.Message.Text
+		handleUserMessage(update)
+	}
+}
 
-		stateMu.Lock()
-		st, ok := contactSteps[chatID]
-		stateMu.Unlock()
-		if ok {
-			switch st.Stage {
-			case 1:
-				requestUserName(chatID, userText, st)
-				continue
-			case 2:
-				requestUserPhoneNumber(chatID, userText)
-				continue
-			}
-		}
+func handleUserMessage(update tgbotapi.Update) {
+	chatID := update.Message.Chat.ID
+	conversation.EnsureSession(repo, chatID)
+	userText := update.Message.Text
+	var answer string
 
-		lowerRequest := strings.ToLower(userText)
-		if util.ContainsStringFromSlice(lowerRequest, config.Settings.CallManagerTriggerWords) {
-			conversation.AppendHistory(repo, chatID, "user", userText)
-			userBot.Send(callMeBackButton(chatID))
-			continue
-		}
-
-		answer, err := handler.ProcessQuestionWithHistory(repo, aiClient, chatID, userText)
-		if err != nil {
-			SendToAllAdmins(fmt.Sprintf("Возникла ошибка: %s", err))
-			answer = "Возникла ошибка. Пожалуйста, попробуйте повторить ваш запрос позднее."
-		}
-
+	defer func() {
 		conversation.AppendHistory(repo, chatID, "user", userText)
-		conversation.AppendHistory(repo, chatID, "assistant", answer)
+		if answer != "" {
+			conversation.AppendHistory(repo, chatID, "assistant", answer)
+		}
+	}()
 
+	stateMu.Lock()
+	st, ok := contactSteps[chatID]
+	stateMu.Unlock()
+	if ok {
+		switch st.Stage {
+		case 1:
+			requestUserName(chatID, userText, st)
+			return
+		case 2:
+			requestUserPhoneNumber(chatID, userText)
+			return
+		}
+	}
+
+	lowerRequest := strings.ToLower(userText)
+	if util.ContainsStringFromSlice(lowerRequest, config.Settings.CallManagerTriggerWords) {
+		userBot.Send(callMeBackButton(chatID))
+		return
+	}
+
+	answer, err := handler.ProcessQuestionWithHistory(repo, aiClient, chatID, userText)
+	if err != nil {
+		SendToAllAdmins(fmt.Sprintf("Возникла ошибка: %s", err))
+		answer = "Возникла ошибка. Пожалуйста, попробуйте повторить ваш запрос позднее."
+	} else {
 		lowerAnswer := strings.ToLower(answer)
 		if util.ContainsStringFromSlice(lowerAnswer, config.Settings.CallManagerTriggerWordsInAnswer) {
 			userBot.Send(callMeBackButton(chatID))
-			continue
+			return
 		}
+	}
 
-		replyToUser(chatID, answer)
+	replyToUser(chatID, answer)
+}
+
+func handleCallbackQuery(update tgbotapi.Update) {
+	chatID := update.CallbackQuery.Message.Chat.ID
+	conversation.EnsureSession(repo, chatID)
+	data := update.CallbackQuery.Data
+	callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
+	if _, err := userBot.Request(callback); err != nil {
+		log.Printf("Callback answer error: %v", err)
+	}
+
+	// Handle actions
+	switch data {
+	case "CALL_MANAGER":
+		callManagerAction(chatID)
+	default:
+		log.Printf("Unknown CallbackQuery data: %s", data)
 	}
 }
 
 func replyToUser(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
 	userBot.Send(msg)
-	conversation.AppendHistory(repo, chatID, "assistant", message)
 }
