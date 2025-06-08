@@ -100,22 +100,21 @@ if [ "$USE_SSL" = false ]; then
     export SSL_EMAIL="${SSL_EMAIL:-admin@$DOMAIN_NAME}"
     export CERTBOT_STAGING="${CERTBOT_STAGING:-}"  # Remove --staging for production
 
-    # Run certbot to obtain certificates
-    docker compose --profile ssl run --rm certbot /bin/sh -c "
-        echo 'Obtaining SSL certificate for $DOMAIN_NAME...' &&
-        certbot certonly --webroot -w /var/www/certbot \
-            --email $SSL_EMAIL \
-            -d $DOMAIN_NAME \
-            --rsa-key-size 4096 \
-            --agree-tos \
-            --non-interactive \
-            $CERTBOT_STAGING
-    "
+    # Run certbot to obtain certificates using a one-time container
+    docker compose run --rm certbot certbot certonly --webroot -w /var/www/certbot \
+        --email "$SSL_EMAIL" \
+        -d "$DOMAIN_NAME" \
+        --rsa-key-size 4096 \
+        --agree-tos \
+        --non-interactive \
+        $CERTBOT_STAGING
 
     if [ $? -eq 0 ]; then
         print_success "SSL certificates obtained successfully!"
     else
         print_error "Failed to obtain SSL certificates"
+        print_status "Checking certbot logs..."
+        docker compose logs certbot
         exit 1
     fi
 fi
