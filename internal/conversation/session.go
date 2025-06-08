@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"database/sql"
 	"log"
 
 	"ragbot/internal/repository"
@@ -42,6 +43,16 @@ func UpdatePhone(repo *repository.Repository, chatID int64, phone string) {
 	if err := repo.UpdatePhone(context.Background(), chatID, phone); err != nil {
 		log.Printf("update phone error: %v", err)
 	}
+}
+
+func UpdateAmoContactID(repo *repository.Repository, chatID int64, contactID sql.NullInt64) {
+	if err := repo.UpdateAmoContactID(context.Background(), chatID, contactID); err != nil {
+		log.Printf("update amo contact id error: %v", err)
+	}
+}
+
+func ClearAmoContactID(repo *repository.Repository, chatID int64) {
+	UpdateAmoContactID(repo, chatID, sql.NullInt64{})
 }
 
 func GetFullHistory(repo *repository.Repository, chatID int64) []HistoryItem {

@@ -20,7 +20,7 @@ func finalizeContactRequest(chatID int64) {
 		adminMsg := fmt.Sprintf(msgAdminSummaryFormat, info.Name.String, info.Phone.String, info.Summary.String, link)
 		SendToAllAdmins(adminMsg)
 
-		err = amo.SendLeadToAMO(&info, link)
+		err = amo.SendLeadToAMO(repo, &info, link)
 		if err != nil {
 			log.Printf("Error sending lead to AMO: %v", err)
 		}
