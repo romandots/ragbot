@@ -7,8 +7,8 @@ const (
 	msgConfirmNo            = "Нет"
 	msgConfirmContactFormat = "Мы нашли ваши контактные данные: %s, %s. Всё верно?"
 	msgAskName              = "Как к вам можно обращаться?"
-	msgAskPhone             = "Напишите ваш телефон для связи"
-	msgManagerWillCall      = "Наш менеджер свяжется с вами в ближайшее время"
+	msgAskPhone             = "Напишите ваш телефон для связи."
+	msgManagerWillCall      = "Наш менеджер свяжется с вами в ближайшее время."
 	msgAdminSummaryFormat   = "%s (%s): %s\n\n%s"
 	msgAdminErrorFormat     = "Возникла ошибка: %s"
 	msgUserError            = "Возникла ошибка. Пожалуйста, попробуйте повторить ваш запрос позднее."
@@ -31,10 +31,12 @@ const (
 )
 
 const (
-	promptUserPrefix      = "Пользователь: "
-	promptAssistantPrefix = "Помощник: "
-	promptSummarizeFormat = "Суммаризируй диалог пользователя в двух предложениях:\n%s\nРезюме:"
-	historyCallRequested  = "** хочет, чтобы ему перезвонили **"
-	historyConfirmYes     = "** подтвердил контактные данные **"
-	historyConfirmNo      = "** опроверг контактные данные **"
+	promptUserPrefix        = "Пользователь: "
+	promptAssistantPrefix   = "Помощник: "
+	promptSummarizeGist     = "Суммаризируй диалог пользователя в двух предложениях:\n%s\nРезюме:"
+	promptSummarizeTitle    = "Суммаризируй суть запроса в 3-5 словах, кроме того, что пользователь запросил звонок:\n%s\nСуть:"
+	promptSummarizeInterest = "Вычлени, если есть, упоминания танцевальных классов или направлений, выбранных пользователем. Если таковых нет, верни пустую строку:\n%s\nКлассы:"
+	historyCallRequested    = "** хочет, чтобы ему перезвонили **"
+	historyConfirmYes       = "** подтвердил контактные данные **"
+	historyConfirmNo        = "** опроверг контактные данные **"
 )

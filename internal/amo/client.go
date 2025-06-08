@@ -4,25 +4,27 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"ragbot/internal/config"
+	"ragbot/internal/conversation"
+	"strings"
 	"time"
 )
 
 const (
 	// HTTP request constants
-	contentType    = "application/json"
-	noteTypeCommon = "common"
-	phoneFieldCode = "PHONE"
-	phoneEnumCode  = "WORK"
-	requestTimeout = 10 * time.Second
+	contentType         = "application/json"
+	phoneFieldCode      = "PHONE"
+	phoneFieldValueCode = "MOB"
+	requestTimeout      = 100 * time.Second
 
 	// API endpoints format
 	leadsComplexEndpoint = "https://%s/api/v4/leads/complex"
-	leadsNotesEndpoint   = "https://%s/api/v4/leads/%d/notes"
+	contactsEndpoint     = "https://%s/api/v4/contacts"
 )
 
 // HTTPClient интерфейс для HTTP-клиента, чтобы можно было заменять его в тестах
@@ -47,26 +49,43 @@ var defaultClient = DefaultAmoClient()
 
 // Lead represents an amoCRM lead structure
 type lead struct {
-	Name     string `json:"name,omitempty"`
-	Embedded embed  `json:"_embedded,omitempty"`
+	Name               string `json:"name,omitempty"`
+	Embedded           embed  `json:"_embedded,omitempty"`
+	CustomFieldsValues []cf   `json:"custom_fields_values,omitempty"`
 }
 
 // Value represents a value in custom fields
 type value struct {
-	Value    string `json:"value"`
-	EnumCode string `json:"enum_code"`
+	Value    string `json:"value,omitempty"`
+	EnumCode string `json:"enum_code,omitempty"`
+	EnumId   int    `json:"enum_id,omitempty"`
 }
 
 // CustomField represents a custom field in amoCRM
 type cf struct {
-	FieldCode string  `json:"field_code"`
+	FieldCode string  `json:"field_code,omitempty"`
+	FieldId   int     `json:"field_id,omitempty"`
 	Values    []value `json:"values"`
 }
 
 // Contact represents a contact in amoCRM
 type contact struct {
+	Name               string `json:"name,omitempty"`
 	FirstName          string `json:"first_name,omitempty"`
 	CustomFieldsValues []cf   `json:"custom_fields_values,omitempty"`
+	ID                 int    `json:"id,omitempty"`
+}
+
+type savedContact struct {
+	ID         int    `json:"id"`
+	IsDeleted  bool   `json:"is_deleted"`
+	IsUnsorted bool   `json:"is_unsorted"`
+	RequestID  string `json:"request_id"`
+	Links      struct {
+		Self struct {
+			Href string `json:"href"`
+		} `json:"self"`
+	} `json:"_links"`
 }
 
 // Embed represents embedded data in a lead
@@ -74,72 +93,88 @@ type embed struct {
 	Contacts []contact `json:"contacts,omitempty"`
 }
 
-// LeadResponse represents the response from creating a lead
-type leadResponse struct {
+// ContactResponse представляет ответ от создания контакта в amoCRM
+type contactResponse struct {
+	Links struct {
+		Self struct {
+			Href string `json:"href"`
+		} `json:"self"`
+	} `json:"_links"`
 	Embedded struct {
-		Leads []struct {
-			ID int `json:"id"`
-		} `json:"leads"`
+		Contacts []savedContact `json:"contacts"`
 	} `json:"_embedded"`
 }
 
-// SendLead creates a lead in amoCRM using the API v4.
-func SendLead(name, phone, comment string) error {
-	return defaultClient.SendLead(name, phone, comment)
+// SendLeadToAMO creates a lead in amoCRM using the API v4.
+func SendLeadToAMO(info *conversation.ChatInfo, link string) error {
+	return defaultClient.SendLeadToAMO(info, link)
 }
 
-// SendLead создает лид в amoCRM используя API v4
-func (c *AmoClient) SendLead(name, phone, comment string) error {
+// SendLeadToAMO создает лид в amoCRM используя API v4
+func (c *AmoClient) SendLeadToAMO(info *conversation.ChatInfo, link string) error {
 	if config.Config.AmoDomain == "" || config.Config.AmoAccessToken == "" {
 		log.Println("AMO integration not configured")
 		return nil
 	}
 
+	loadConfig()
+
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
+	branches := make([]string, 0)
+	lowerSummary := strings.ToLower(info.Summary.String)
+	for branch, _ := range amoConfig.branchFieldValuesMap {
+		lowerBranch := strings.ToLower(branch)
+		if strings.Contains(lowerSummary, lowerBranch) {
+			branches = append(branches, branch)
+		}
+	}
+
+	// Create contact
+	cont, err := c.createContact(ctx, info.Name.String, info.Phone.String)
+
 	// Create lead
-	resp, err := c.createLead(ctx, name, phone)
+	_, err = c.createLead(ctx, info.Title.String, cont, info.Summary.String, link, branches)
 	if err != nil {
-		return fmt.Errorf("failed to create lead: %w", err)
-	}
-	defer resp.Body.Close()
-
-	var lr leadResponse
-	if err := json.NewDecoder(resp.Body).Decode(&lr); err != nil {
-		return fmt.Errorf("failed to decode lead response: %w", err)
-	}
-
-	// If there's no comment or no leads were created, we're done
-	if comment == "" || len(lr.Embedded.Leads) == 0 {
-		return nil
-	}
-
-	// Create note
-	if _, err = c.createNote(ctx, lr, comment); err != nil {
-		return fmt.Errorf("failed to create note: %w", err)
+		errMsg := fmt.Sprintf("Failed to create a lead: %s", err)
+		return errors.New(errMsg)
 	}
 
 	return nil
 }
 
-func (c *AmoClient) createLead(ctx context.Context, name, phone string) (*http.Response, error) {
-	lead := buildLead(name, phone)
+func (c *AmoClient) createContact(ctx context.Context, name, phone string) (*savedContact, error) {
+	lead := buildContact(name, phone)
+	url := fmt.Sprintf(contactsEndpoint, config.Config.AmoDomain)
+
+	resp, err := c.makeJSONRequest(ctx, url, []any{lead})
+	if err != nil || resp == nil || resp.Body == nil {
+		errMsg := fmt.Sprintf("Failed to create a contact: %s", err)
+		return nil, errors.New(errMsg)
+	}
+	defer resp.Body.Close()
+
+	var contactResp contactResponse
+	if err := json.NewDecoder(resp.Body).Decode(&contactResp); err != nil {
+		errMsg := fmt.Sprintf("Failed to parse a contact response: %s", err)
+		return nil, errors.New(errMsg)
+	} else {
+		log.Printf("contact response: %+v", contactResp)
+	}
+
+	if len(contactResp.Embedded.Contacts) < 1 {
+		return nil, errors.New("No contacts created")
+	}
+
+	return &contactResp.Embedded.Contacts[0], nil
+}
+
+func (c *AmoClient) createLead(ctx context.Context, leadName string, cont *savedContact, summary, link string, branches []string) (*http.Response, error) {
+	lead := buildLead(leadName, cont, summary, link, branches)
 	url := fmt.Sprintf(leadsComplexEndpoint, config.Config.AmoDomain)
 
 	return c.makeJSONRequest(ctx, url, []any{lead})
-}
-
-func (c *AmoClient) createNote(ctx context.Context, lr leadResponse, comment string) (*http.Response, error) {
-	noteURL := fmt.Sprintf(leadsNotesEndpoint, config.Config.AmoDomain, lr.Embedded.Leads[0].ID)
-	noteBody := []map[string]any{
-		{
-			"note_type": noteTypeCommon,
-			"params":    map[string]string{"text": comment},
-		},
-	}
-
-	return c.makeJSONRequest(ctx, noteURL, noteBody)
 }
 
 func (c *AmoClient) makeJSONRequest(ctx context.Context, url string, payload any) (*http.Response, error) {
@@ -170,21 +205,57 @@ func (c *AmoClient) makeJSONRequest(ctx context.Context, url string, payload any
 	return resp, nil
 }
 
-func buildLead(name, phone string) *lead {
-	return &lead{
+func buildContact(name, phone string) *contact {
+	return &contact{
 		Name: name,
+		CustomFieldsValues: []cf{
+			{
+				FieldCode: phoneFieldCode,
+				Values:    []value{{Value: phone, EnumCode: phoneFieldValueCode}},
+			},
+		},
+	}
+}
+
+func buildLead(leadName string, cont *savedContact, summary, link string, branches []string) *lead {
+	l := &lead{
+		Name: leadName,
+		CustomFieldsValues: []cf{
+			{
+				FieldId: amoConfig.sourceFieldId,
+				Values:  []value{{EnumId: amoConfig.sourceFieldValueId}},
+			},
+			{
+				FieldId: amoConfig.summaryFieldId,
+				Values:  []value{{Value: summary}},
+			},
+			{
+				FieldId: amoConfig.chatLinkFieldId,
+				Values:  []value{{Value: link}},
+			},
+		},
 		Embedded: embed{
 			Contacts: []contact{
 				{
-					FirstName: name,
-					CustomFieldsValues: []cf{
-						{
-							FieldCode: phoneFieldCode,
-							Values:    []value{{Value: phone, EnumCode: phoneEnumCode}},
-						},
-					},
+					ID: cont.ID,
 				},
 			},
 		},
 	}
+
+	branchesValues := make([]value, 0)
+	for _, branch := range branches {
+		if branchValueId, ok := amoConfig.branchFieldValuesMap[branch]; ok {
+			branchesValues = append(branchesValues, value{EnumId: branchValueId})
+		}
+	}
+
+	if len(branchesValues) > 0 {
+		l.CustomFieldsValues = append(l.CustomFieldsValues, cf{
+			FieldId: amoConfig.branchFieldId,
+			Values:  branchesValues,
+		})
+	}
+
+	return l
 }

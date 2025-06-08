@@ -131,11 +131,13 @@ func (r *Repository) UpdateChunkWithCreatedAt(ctx context.Context, id int, conte
 // --- conversation operations ---
 
 type ChatInfo struct {
-	ID      string
-	ChatID  int64
-	Summary sql.NullString
-	Name    sql.NullString
-	Phone   sql.NullString
+	ID       string
+	ChatID   int64
+	Title    sql.NullString
+	Summary  sql.NullString
+	Interest sql.NullString
+	Name     sql.NullString
+	Phone    sql.NullString
 }
 
 type HistoryItem struct {
@@ -155,7 +157,7 @@ func (r *Repository) EnsureSession(ctx context.Context, chatID int64) (string, e
 func (r *Repository) GetChatInfoByChatID(ctx context.Context, chatID int64) (ChatInfo, error) {
 	var info ChatInfo
 	err := r.db.QueryRowContext(ctx,
-		`SELECT uuid, summary, name, phone FROM conversations WHERE chat_id=$1`, chatID).Scan(&info.ID, &info.Summary, &info.Name, &info.Phone)
+		`SELECT uuid, summary, title, interest, name, phone FROM conversations WHERE chat_id=$1`, chatID).Scan(&info.ID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone)
 	if err != nil {
 		return info, err
 	}
@@ -166,7 +168,7 @@ func (r *Repository) GetChatInfoByChatID(ctx context.Context, chatID int64) (Cha
 func (r *Repository) GetChatInfoByUUID(ctx context.Context, uuid string) (ChatInfo, error) {
 	var info ChatInfo
 	err := r.db.QueryRowContext(ctx,
-		`SELECT chat_id, summary, name, phone FROM conversations WHERE uuid=$1`, uuid).Scan(&info.ChatID, &info.Summary, &info.Name, &info.Phone)
+		`SELECT chat_id, summary, title, interest, name, phone FROM conversations WHERE uuid=$1`, uuid).Scan(&info.ChatID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone)
 	if err != nil {
 		return info, err
 	}
@@ -174,9 +176,9 @@ func (r *Repository) GetChatInfoByUUID(ctx context.Context, uuid string) (ChatIn
 	return info, nil
 }
 
-func (r *Repository) UpdateSummary(ctx context.Context, chatID int64, summary string) error {
+func (r *Repository) UpdateSummary(ctx context.Context, chatID int64, summary, title, interest string) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE conversations SET summary=$1, updated_at=NOW() WHERE chat_id=$2`, summary, chatID)
+		`UPDATE conversations SET summary=$1, title=$2, interest=$3, updated_at=NOW() WHERE chat_id=$4`, summary, title, interest, chatID)
 	return err
 }
 

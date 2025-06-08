@@ -26,8 +26,8 @@ func GetChatInfoByUUID(repo *repository.Repository, uuid string) (ChatInfo, erro
 	return repo.GetChatInfoByUUID(context.Background(), uuid)
 }
 
-func UpdateSummary(repo *repository.Repository, chatID int64, summary string) {
-	if err := repo.UpdateSummary(context.Background(), chatID, summary); err != nil {
+func UpdateSummary(repo *repository.Repository, chatID int64, summary, title, interest string) {
+	if err := repo.UpdateSummary(context.Background(), chatID, summary, title, interest); err != nil {
 		log.Printf("update summary error: %v", err)
 	}
 }

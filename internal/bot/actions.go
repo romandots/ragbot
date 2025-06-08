@@ -3,11 +3,9 @@ package bot
 import (
 	"fmt"
 	"log"
-	"ragbot/internal/ai"
 	"ragbot/internal/amo"
 	"ragbot/internal/config"
 	"ragbot/internal/conversation"
-	"ragbot/internal/repository"
 	"strings"
 )
 
@@ -21,7 +19,11 @@ func finalizeContactRequest(chatID int64) {
 		link := fmt.Sprintf(chatUrlFormat, config.Config.BaseURL, info.ID)
 		adminMsg := fmt.Sprintf(msgAdminSummaryFormat, info.Name.String, info.Phone.String, info.Summary.String, link)
 		SendToAllAdmins(adminMsg)
-		amo.SendLead(info.Name.String, info.Phone.String, info.Summary.String+"\n\n"+link)
+
+		err = amo.SendLeadToAMO(&info, link)
+		if err != nil {
+			log.Printf("Error sending lead to AMO: %v", err)
+		}
 	}
 }
 
@@ -44,9 +46,9 @@ func requestUserName(chatID int64, userText string, st *contactState) {
 func callManagerAction(chatID int64) {
 	conversation.AppendHistory(repo, chatID, "user", historyCallRequested)
 
-	summary, err := summarize(repo, aiClient, chatID)
+	summary, title, interest, err := summarize(chatID)
 	if err == nil {
-		conversation.UpdateSummary(repo, chatID, summary)
+		conversation.UpdateSummary(repo, chatID, summary, title, interest)
 	} else {
 		log.Printf("summary error: %v", err)
 	}
@@ -68,7 +70,7 @@ func callManagerAction(chatID int64) {
 	replyToUser(chatID, msgAskName)
 }
 
-func summarize(repo *repository.Repository, aiClient *ai.AIClient, chatID int64) (string, error) {
+func extractGist(chatID int64, prompt string) (string, error) {
 	hist := conversation.GetHistory(repo, chatID)
 	var sb strings.Builder
 	for _, h := range hist {
@@ -78,7 +80,31 @@ func summarize(repo *repository.Repository, aiClient *ai.AIClient, chatID int64)
 			sb.WriteString(promptAssistantPrefix + h.Content + "\n")
 		}
 	}
-	prompt := fmt.Sprintf(promptSummarizeFormat, sb.String())
-	summary, err := aiClient.GenerateResponse(prompt)
+	summary, err := aiClient.GenerateResponse(fmt.Sprintf(prompt, sb.String()))
 	return summary, err
+}
+
+func summarize(chatID int64) (summary, title, interest string, err error) {
+	hist := conversation.GetHistory(repo, chatID)
+	var sb strings.Builder
+	for _, h := range hist {
+		if h.Role == "user" {
+			sb.WriteString(promptUserPrefix + h.Content + "\n")
+		} else {
+			sb.WriteString(promptAssistantPrefix + h.Content + "\n")
+		}
+	}
+	summary, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeGist, sb.String()))
+	if err != nil {
+		return
+	}
+
+	title, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeTitle, sb.String()))
+	if err != nil {
+		return
+	}
+
+	interest, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeInterest, sb.String()))
+
+	return
 }
