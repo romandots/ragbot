@@ -54,13 +54,13 @@ func (f *FileSource) process(repo *repository.Repository) {
 		if line == "" {
 			continue
 		}
-		added, err := repo.AddChunk(context.Background(), line, fileSource)
+		id, err := repo.AddChunk(context.Background(), line, fileSource)
 		if err != nil {
 			log.Printf("file source insert error: %v", err)
 			continue
 		}
-		if added {
-			log.Printf("Chunk added: %s", line)
+		if id != 0 {
+			log.Printf("Chunk added #%d: %s", id, line)
 		}
 	}
 	if err := scanner.Err(); err != nil {

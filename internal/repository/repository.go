@@ -21,25 +21,29 @@ func (r *Repository) Ping(ctx context.Context) error {
 
 // --- chunk operations ---
 
-// AddChunk inserts a new chunk. It returns true if the row was inserted.
-func (r *Repository) AddChunk(ctx context.Context, content, source string) (bool, error) {
-	res, err := r.db.ExecContext(ctx,
-		"INSERT INTO chunks(content, source) VALUES($1,$2) ON CONFLICT (content) DO NOTHING",
+// AddChunk inserts a new chunk. It returns its ID the row was inserted.
+func (r *Repository) AddChunk(ctx context.Context, content, source string) (int, error) {
+	var id int
+	err := r.db.QueryRowContext(ctx,
+		"INSERT INTO chunks(content, source) VALUES($1,$2) ON CONFLICT (content) DO NOTHING RETURNING id",
 		content, source,
-	)
-	if err != nil {
-		return false, err
+	).Scan(&id)
+	if err == sql.ErrNoRows {
+		return 0, nil
 	}
-	rows, err := res.RowsAffected()
 	if err != nil {
-		return false, err
+		return 0, err
 	}
-	return rows > 0, nil
+	return id, nil
 }
 
-func (r *Repository) DeleteChunk(ctx context.Context, id int) error {
-	_, err := r.db.ExecContext(ctx, "DELETE FROM chunks WHERE id=$1", id)
-	return err
+func (r *Repository) DeleteChunk(ctx context.Context, id int) (string, error) {
+	var content string
+	err := r.db.QueryRowContext(ctx, "DELETE FROM chunks WHERE id=$1 RETURNING content", id).Scan(&content)
+	if err != nil {
+		return "", err
+	}
+	return content, nil
 }
 
 func (r *Repository) UpdateChunk(ctx context.Context, id int, content string) error {

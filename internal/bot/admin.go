@@ -64,11 +64,12 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 				replyToAdmin(chatID, msgAdminInvalidID)
 				continue
 			}
-			if err := repo.DeleteChunk(context.Background(), id); err != nil {
-				replyToAdmin(chatID, msgAdminDeleteError)
+			content, err := repo.DeleteChunk(context.Background(), id)
+			if err != nil {
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminDeleteError, id))
 				continue
 			}
-			replyToAdmin(chatID, fmt.Sprintf(msgAdminDeletedFormat, id))
+			replyToAdmin(chatID, fmt.Sprintf(msgAdminDeletedFormat, id, content))
 
 		case strings.HasPrefix(text, "/update "):
 			parts := strings.SplitN(strings.TrimPrefix(text, "/update "), " ", 2)
@@ -83,20 +84,20 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 			}
 			content := parts[1]
 			if err := repo.UpdateChunk(context.Background(), id, content); err != nil {
-				replyToAdmin(chatID, msgAdminUpdateError)
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminUpdateError, id, content))
 				continue
 			}
-			replyToAdmin(chatID, fmt.Sprintf(msgAdminUpdatedFormat, id))
+			replyToAdmin(chatID, fmt.Sprintf(fmt.Sprintf(msgAdminUpdatedFormat, id, content)))
 
 		default:
 			content := strings.Trim(text, " ")
-			added, err := repo.AddChunk(context.Background(), content, source)
+			id, err := repo.AddChunk(context.Background(), content, source)
 			if err != nil {
-				replyToAdmin(chatID, msgAdminAddError)
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminAddError, content))
 				continue
 			}
-			if added {
-				replyToAdmin(chatID, msgAdminAdded)
+			if id != 0 {
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminAdded, id, content))
 			} else {
 				replyToAdmin(chatID, msgAdminExists)
 			}
