@@ -6,6 +6,8 @@
 
 - Docker и Docker Compose
 - Go (для локальной разработки)
+- Доменное имя, указывающее на IP-адрес вашего сервера (для продакшн-развертывания)
+- Открытые порты 80 и 443 на сервере (для продакшн-развертывания)
 
 ## Переменные окружения
 
@@ -23,12 +25,18 @@
 | `ADMIN_TELEGRAM_TOKEN` | Токен для административного Telegram бота |
 | `ADMIN_CHAT_IDS` | Список ID чатов администраторов (через запятую) |
 
+### Переменные для продакшн-развертывания
+
+| Переменная | Описание |
+|------------|----------|
+| `DOMAIN_NAME` | Домен для настройки Nginx и SSL (обязательно для продакшена) |
+| `SSL_EMAIL` | Email для получения SSL-сертификатов Let's Encrypt |
+
 ### Опциональные переменные
 
 | Переменная | Описание |
 |------------|----------|
 | `BASE_URL` | Базовый URL приложения (по умолчанию `localhost:8080`) |
-| `DOMAIN_NAME` | Домен для настройки Nginx и SSL |
 | `USE_LOCAL_MODEL` | Флаг для использования локальной модели (`true` или `false`) |
 | `OPENAI_API_KEY` | API ключ для OpenAI (обязателен, если `USE_LOCAL_MODEL=false`) |
 | `USER_TELEGRAM_BOT_NAME` | Имя пользовательского Telegram бота |
@@ -39,6 +47,7 @@
 | `AMO_ACCESS_TOKEN` | OAuth токен доступа для API amoCRM |
 | `PREAMBLE` | Преамбула для взаимодействия с моделью |
 | `CALL_MANAGER_TRIGGER_WORDS` | Слова-триггеры для вызова менеджера (через запятую) |
+| `CERTBOT_STAGING` | Добавить `--staging` для тестовых сертификатов (опционально) |
 
 ## Установка
 
@@ -49,21 +58,30 @@
    cd rag-bot
    ```
 
-2. Создайте файл `.env` в корне проекта и добавьте необходимые переменные окружения:
+2. Создайте файл `.env` по примеру `.env.example` в корне проекта и добавьте необходимые переменные окружения:
 
 ```env
-DATABASE_URL=postgres://user:password@db:5432/ragbot
+# Основные переменные
+DATABASE_URL=postgres://ragbot:your_password@db:5432/ragbot
 POSTGRES_DB=ragbot
-POSTGRES_USER=user
-POSTGRES_PASSWORD=password
+POSTGRES_USER=ragbot
+POSTGRES_PASSWORD=your_secure_password_here
 USER_TELEGRAM_TOKEN=your_user_telegram_token
 ADMIN_TELEGRAM_TOKEN=your_admin_telegram_token
 ADMIN_CHAT_IDS=123456789,987654321
+
+# Переменные для продакшн-развертывания
+DOMAIN_NAME=yourdomain.com
+SSL_EMAIL=admin@yourdomain.com
+
+# Опциональные переменные
 USE_LOCAL_MODEL=true
 OPENAI_API_KEY=your_openai_api_key
 EDUCATION_FILE_PATH=education.txt
 USE_EXTERNAL_SOURCE=false
-DOMAIN_NAME=example.com
+
+# Для тестирования с staging сертификатами (раскомментируйте при необходимости)
+# CERTBOT_STAGING=--staging
 ```
 
 ## Запуск в среде разработки
@@ -90,26 +108,61 @@ DOMAIN_NAME=example.com
 
 Приложение будет доступно по адресу `http://localhost:8080`.
 
-## Запуск в продакшен-среде
+## Запуск в продакшн-среде
 
-Для запуска в продакшен-среде используется Docker Compose с настройкой Nginx и SSL-сертификатов через Certbot:
+### Автоматическое развертывание (рекомендуется)
 
-1. Убедитесь, что в файле `.env` правильно настроен `DOMAIN_NAME`
+Для продакшн-развертывания используется автоматизированный скрипт, который решает проблему SSL-сертификатов:
 
-2. Инициализируйте SSL-сертификаты (при первом запуске):
+1. **Настройте переменные окружения:**
 
-   ```bash
-   chmod +x init-letsencrypt.sh
-   ./init-letsencrypt.sh
-   ```
+   Убедитесь, что в файле `.env` правильно настроены `DOMAIN_NAME` и `SSL_EMAIL`.
 
-3. Запустите все сервисы:
+2. **Запустите автоматическое развертывание:**
 
    ```bash
-   docker-compose --env-file .env up -d
+   chmod +x deploy-production.sh
+   ./deploy-production.sh
    ```
 
-После запуска сервис будет доступен по адресу `https://ваш-домен.com`.
+Скрипт автоматически:
+- Запустит приложение в HTTP-режиме
+- Получит SSL-сертификаты от Let's Encrypt
+- Переключит nginx на HTTPS-конфигурацию
+- Настроит автоматическое обновление сертификатов
+
+### Проверка развертывания
+
+После запуска сервис будет доступен по адресам:
+- HTTP: `http://ваш-домен.com`
+- HTTPS: `https://ваш-домен.com`
+
+Для проверки статуса сервисов:
+```bash
+docker-compose ps
+```
+
+Для просмотра логов:
+```bash
+docker-compose logs -f [имя_сервиса]
+```
+
+### Остановка сервисов
+
+```bash
+# Остановка всех сервисов
+docker-compose down
+
+# Остановка с удалением volumes (осторожно - удалит данные БД!)
+docker-compose down -v
+```
+
+## Важные замечания для продакшна
+
+1. **DNS-настройка**: Убедитесь, что A-запись вашего домена указывает на IP-адрес сервера
+2. **Firewall**: Откройте порты 80 и 443 в firewall сервера
+3. **Тестирование сертификатов**: При первом развертывании рекомендуется использовать staging-сертификаты (раскомментируйте `CERTBOT_STAGING=--staging` в `.env`)
+4. **Мониторинг**: Следите за логами и статусом сервисов через `docker-compose logs` и `docker-compose ps`
 
 ## Миграции базы данных
 
@@ -143,3 +196,36 @@ DOMAIN_NAME=example.com
    goose -dir internal/db/migrations create имя_миграции sql
    ```
 
+## Устранение неполадок
+
+### Проблемы с SSL-сертификатами
+
+Если возникают проблемы с получением SSL-сертификатов:
+
+1. Проверьте DNS-настройки:
+   ```bash
+   dig yourdomain.com
+   ```
+
+2. Используйте staging-сертификаты для тестирования:
+   ```bash
+   # В .env файле
+   CERTBOT_STAGING=--staging
+   ```
+
+3. Проверьте логи certbot:
+   ```bash
+   docker-compose logs certbot
+   ```
+
+### Проблемы с nginx
+
+Для проверки конфигурации nginx:
+```bash
+docker-compose exec nginx nginx -t
+```
+
+Для перезагрузки конфигурации:
+```bash
+docker-compose exec nginx nginx -s reload
+```
