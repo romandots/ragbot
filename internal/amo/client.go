@@ -232,24 +232,6 @@ func buildContact(name, phone string) *contact {
 func buildLead(leadName string, cont *savedContact, summary, interest, link string, branches []string) *lead {
 	l := &lead{
 		Name: leadName,
-		CustomFieldsValues: []cf{
-			{
-				FieldId: amoConfig.sourceFieldId,
-				Values:  []value{{EnumId: amoConfig.sourceFieldValueId}},
-			},
-			{
-				FieldId: amoConfig.summaryFieldId,
-				Values:  []value{{Value: summary}},
-			},
-			{
-				FieldId: amoConfig.chatLinkFieldId,
-				Values:  []value{{Value: link}},
-			},
-			{
-				FieldId: amoConfig.interestFieldId,
-				Values:  []value{{Value: interest}},
-			},
-		},
 		Embedded: embed{
 			Contacts: []contact{
 				{
@@ -257,6 +239,36 @@ func buildLead(leadName string, cont *savedContact, summary, interest, link stri
 				},
 			},
 		},
+	}
+
+	customFields := []cf{}
+
+	if amoConfig.sourceFieldId != 0 && amoConfig.sourceFieldValueId != 0 {
+		customFields = append(customFields, cf{
+			FieldId: amoConfig.sourceFieldId,
+			Values:  []value{{EnumId: amoConfig.sourceFieldValueId}},
+		})
+	}
+
+	if amoConfig.summaryFieldId != 0 && summary != "" {
+		customFields = append(customFields, cf{
+			FieldId: amoConfig.summaryFieldId,
+			Values:  []value{{Value: summary}},
+		})
+	}
+
+	if amoConfig.chatLinkFieldId != 0 && link != "" {
+		customFields = append(customFields, cf{
+			FieldId: amoConfig.chatLinkFieldId,
+			Values:  []value{{Value: link}},
+		})
+	}
+
+	if amoConfig.interestFieldId != 0 && interest != "" {
+		customFields = append(customFields, cf{
+			FieldId: amoConfig.interestFieldId,
+			Values:  []value{{Value: interest}},
+		})
 	}
 
 	branchesValues := make([]value, 0)
@@ -267,10 +279,14 @@ func buildLead(leadName string, cont *savedContact, summary, interest, link stri
 	}
 
 	if len(branchesValues) > 0 {
-		l.CustomFieldsValues = append(l.CustomFieldsValues, cf{
+		l.CustomFieldsValues = append(customFields, cf{
 			FieldId: amoConfig.branchFieldId,
 			Values:  branchesValues,
 		})
+	}
+
+	if len(customFields) > 0 {
+		l.CustomFieldsValues = customFields
 	}
 
 	return l

@@ -13,18 +13,29 @@ func finalizeContactRequest(chatID int64) {
 	stateMu.Lock()
 	delete(contactSteps, chatID)
 	stateMu.Unlock()
-	replyToUser(chatID, msgManagerWillCall)
 	info, err := conversation.GetChatInfoByChatID(repo, chatID)
-	if err == nil {
-		link := fmt.Sprintf(chatUrlFormat, config.Config.BaseURL, info.ID)
-		adminMsg := fmt.Sprintf(msgAdminSummaryFormat, info.Name.String, info.Phone.String, info.Summary.String, link)
-		SendToAllAdmins(adminMsg)
-
-		err = amo.SendLeadToAMO(repo, &info, link)
-		if err != nil {
-			log.Printf("Error sending lead to AMO: %v", err)
-		}
+	if err != nil {
+		errMsg := fmt.Sprintf("Error sending lead to AMO: %v", err)
+		SendToAllAdmins(errMsg)
+		log.Println(errMsg)
+		replyToUser(chatID, "Извините, возниклка какая-то ошибка. Попробуйте повторить ваш запрос позднее.")
+		return
 	}
+
+	link := fmt.Sprintf(chatUrlFormat, config.Config.BaseURL, info.ID)
+	adminMsg := fmt.Sprintf(msgAdminSummaryFormat, info.Name.String, info.Phone.String, info.Summary.String, link)
+	SendToAllAdmins(adminMsg)
+
+	err = amo.SendLeadToAMO(repo, &info, link)
+	if err == nil {
+		replyToUser(chatID, msgManagerWillCall)
+		return
+	}
+
+	errMsg := fmt.Sprintf("Error sending lead to AMO: %v", err)
+	SendToAllAdmins(errMsg)
+	log.Println(errMsg)
+	replyToUser(chatID, "Извините, возниклка какая-то ошибка. Попробуйте повторить ваш запрос позднее.")
 }
 
 func requestUserPhoneNumber(chatID int64, userText string) {
@@ -99,12 +110,12 @@ func summarize(chatID int64) (summary, title, interest string, err error) {
 		return
 	}
 
-	title, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeTitle, sb.String()))
+	title, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeTitle, summary))
 	if err != nil {
 		return
 	}
 
-	interest, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeInterest, sb.String()))
+	interest, err = aiClient.GenerateResponse(fmt.Sprintf(promptSummarizeInterest, summary))
 
 	return
 }

@@ -117,12 +117,12 @@ func LoadSettings() *AppSettings {
 
 	callManagerTriggerWords := os.Getenv("CALL_MANAGER_TRIGGER_WORDS")
 	if callManagerTriggerWords == "" {
-		callManagerTriggerWords = "записаться,позвать,позови,менеджер,оператор"
+		callManagerTriggerWords = "позвать,позови,менеджер,оператор"
 	}
 
-	callManagerTriggerWordsInAnswer := os.Getenv("CALL_MANAGER_TRIGGER_WORDS")
+	callManagerTriggerWordsInAnswer := os.Getenv("CALL_MANAGER_TRIGGER_WORDS_IN_ANSWER")
 	if callManagerTriggerWordsInAnswer == "" {
-		callManagerTriggerWordsInAnswer = "заказать звонок,позвать менеджера,вам перезвонил"
+		callManagerTriggerWordsInAnswer = "заказать звонок,позвать менеджера,вам перезвонил,оператор"
 	}
 
 	Settings = &AppSettings{

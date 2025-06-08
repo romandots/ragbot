@@ -2,6 +2,7 @@ package util
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -65,13 +66,16 @@ func GetEnvStringSlice(key string, defaultValue []string) []string {
 	return stringValues
 }
 
-func GetEnvJSON(key string) map[interface{}]interface{} {
+func GetEnvJSON(key string) map[string]interface{} {
 	jsonData := os.Getenv(key)
 	if jsonData == "" {
 		return nil
 	}
-	var result map[interface{}]interface{}
-	json.Unmarshal([]byte(jsonData), &result)
+	var result map[string]interface{}
+	err := json.Unmarshal([]byte(jsonData), &result)
+	if err != nil {
+		log.Println(err.Error())
+	}
 	return result
 }
 
@@ -82,7 +86,7 @@ func GetEnvStringIntMap(key string, defaultValue map[string]int) map[string]int 
 	}
 	result := make(map[string]int)
 	for k, v := range mapData {
-		result[k.(string)] = v.(int)
+		result[k] = int(v.(float64))
 	}
 	return result
 }
