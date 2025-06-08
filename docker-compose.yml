@@ -5,6 +5,8 @@ services:
       - "8080:8080"
     env_file:
       - .env
+    volumes:
+      - ./education.txt:/tmp/education.txt
     depends_on:
       db:
         condition: service_healthy
