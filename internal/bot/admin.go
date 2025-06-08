@@ -21,8 +21,9 @@ var adminBot *tgbotapi.BotAPI
 func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64) {
 	defer util.Recover("StartAdminBot")
 
-	// register commands
 	adminBot = connect(token)
+	log.Println("Admin bot connected to Telegram API")
+
 	commands := []tgbotapi.BotCommand{
 		{Command: "start", Description: "Получить ваш chat ID"},
 		{Command: "help", Description: "Показать справку по командам"},
@@ -32,11 +33,8 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 
 	_, err := adminBot.Request(tgbotapi.NewSetMyCommands(commands...))
 	if err != nil {
-		log.Printf("Ошибка при регистрации команд: %v", err)
+		log.Printf("Failed registering commands: %v", err)
 	}
-
-	adminBot = connect(token)
-	log.Println("Admin bot connected to Telegram API")
 
 	adminChats = allowedIDs
 	allowed := make(map[int64]bool)
