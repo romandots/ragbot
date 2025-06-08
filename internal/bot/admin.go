@@ -43,18 +43,12 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 		text := strings.TrimSpace(update.Message.Text)
 
 		if text == "/myid" {
-			replyToAdmin(chatID, fmt.Sprintf("Ваш CHAT ID: %d", chatID))
+			replyToAdmin(chatID, fmt.Sprintf(msgAdminMyIDFormat, chatID))
 			continue
 		}
 
 		if strings.HasPrefix(text, "/help") {
-			replyToAdmin(chatID,
-				"Команды администратора:\n"+
-					"/help — эта справка\n"+
-					"/myid — получить свой chat_id\n"+
-					"/delete <id> — удалить фрагмент по ID\n"+
-					"/update <id> <текст> — обновить фрагмент по ID\n\n"+
-					"Все остальное будет интерпретировано как запись в базу знаний")
+			replyToAdmin(chatID, msgAdminHelp)
 			continue
 		}
 
@@ -67,44 +61,44 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 			idStr := strings.TrimPrefix(text, "/delete ")
 			id, err := strconv.Atoi(idStr)
 			if err != nil {
-				replyToAdmin(chatID, "Неверный ID")
+				replyToAdmin(chatID, msgAdminInvalidID)
 				continue
 			}
 			if err := repo.DeleteChunk(context.Background(), id); err != nil {
-				replyToAdmin(chatID, "Ошибка удаления")
+				replyToAdmin(chatID, msgAdminDeleteError)
 				continue
 			}
-			replyToAdmin(chatID, fmt.Sprintf("Удалён фрагмент %d", id))
+			replyToAdmin(chatID, fmt.Sprintf(msgAdminDeletedFormat, id))
 
 		case strings.HasPrefix(text, "/update "):
 			parts := strings.SplitN(strings.TrimPrefix(text, "/update "), " ", 2)
 			if len(parts) < 2 {
-				replyToAdmin(chatID, "Использование: /update <id> <новый текст>")
+				replyToAdmin(chatID, msgAdminUpdateUsage)
 				continue
 			}
 			id, err := strconv.Atoi(parts[0])
 			if err != nil {
-				replyToAdmin(chatID, "Неверный ID")
+				replyToAdmin(chatID, msgAdminInvalidID)
 				continue
 			}
 			content := parts[1]
 			if err := repo.UpdateChunk(context.Background(), id, content); err != nil {
-				replyToAdmin(chatID, "Ошибка обновления")
+				replyToAdmin(chatID, msgAdminUpdateError)
 				continue
 			}
-			replyToAdmin(chatID, fmt.Sprintf("Обновлён фрагмент %d", id))
+			replyToAdmin(chatID, fmt.Sprintf(msgAdminUpdatedFormat, id))
 
 		default:
 			content := strings.Trim(text, " ")
 			added, err := repo.AddChunk(context.Background(), content, source)
 			if err != nil {
-				replyToAdmin(chatID, "Ошибка добавления")
+				replyToAdmin(chatID, msgAdminAddError)
 				continue
 			}
 			if added {
-				replyToAdmin(chatID, "Добавлено")
+				replyToAdmin(chatID, msgAdminAdded)
 			} else {
-				replyToAdmin(chatID, "Уже существует")
+				replyToAdmin(chatID, msgAdminExists)
 			}
 		}
 	}
