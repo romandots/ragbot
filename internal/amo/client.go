@@ -22,7 +22,7 @@ const (
 	contentType         = "application/json"
 	phoneFieldCode      = "PHONE"
 	phoneFieldValueCode = "MOB"
-	requestTimeout      = 100 * time.Second
+	requestTimeout      = 10 * time.Second
 
 	// API endpoints format
 	leadsComplexEndpoint = "https://%s/api/v4/leads/complex"
@@ -147,7 +147,7 @@ func (c *AmoClient) SendLeadToAMO(repo *repository.Repository, info *conversatio
 	}
 
 	// Create lead
-	_, err = c.createLead(ctx, info.Title.String, cont, info.Summary.String, link, branches)
+	_, err = c.createLead(ctx, cont, info.Title.String, info.Summary.String, info.Interest.String, link, branches)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create a lead: %s", err)
 		return errors.New(errMsg)
@@ -182,8 +182,8 @@ func (c *AmoClient) createContact(ctx context.Context, name, phone string) (*sav
 	return &contactResp.Embedded.Contacts[0], nil
 }
 
-func (c *AmoClient) createLead(ctx context.Context, leadName string, cont *savedContact, summary, link string, branches []string) (*http.Response, error) {
-	lead := buildLead(leadName, cont, summary, link, branches)
+func (c *AmoClient) createLead(ctx context.Context, cont *savedContact, leadName, summary, interest, link string, branches []string) (*http.Response, error) {
+	lead := buildLead(leadName, cont, summary, interest, link, branches)
 	url := fmt.Sprintf(leadsComplexEndpoint, config.Config.AmoDomain)
 
 	return c.makeJSONRequest(ctx, url, []any{lead})
@@ -229,7 +229,7 @@ func buildContact(name, phone string) *contact {
 	}
 }
 
-func buildLead(leadName string, cont *savedContact, summary, link string, branches []string) *lead {
+func buildLead(leadName string, cont *savedContact, summary, interest, link string, branches []string) *lead {
 	l := &lead{
 		Name: leadName,
 		CustomFieldsValues: []cf{
@@ -244,6 +244,10 @@ func buildLead(leadName string, cont *savedContact, summary, link string, branch
 			{
 				FieldId: amoConfig.chatLinkFieldId,
 				Values:  []value{{Value: link}},
+			},
+			{
+				FieldId: amoConfig.interestFieldId,
+				Values:  []value{{Value: interest}},
 			},
 		},
 		Embedded: embed{

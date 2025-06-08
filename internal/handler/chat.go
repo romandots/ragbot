@@ -15,7 +15,7 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <script src="https://cdn.tailwindcss.com"></script>
-<title>Чат с {{.Name}}</title>
+<title>{{.Title}}</title>
 </head>
 <body class="bg-gray-100">
 <div class="max-w-2xl mx-auto p-4">
@@ -61,11 +61,13 @@ func ChatHandler(repo *repository.Repository) http.HandlerFunc {
 		}
 		history := conversation.GetFullHistory(repo, info.ChatID)
 		data := struct {
+			Title   string
 			Summary string
 			Name    string
 			Phone   string
 			History []conversation.HistoryItem
 		}{
+			Title:   info.Title.String,
 			Summary: info.Summary.String,
 			Name:    info.Name.String,
 			Phone:   info.Phone.String,
