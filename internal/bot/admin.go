@@ -21,6 +21,20 @@ var adminBot *tgbotapi.BotAPI
 func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64) {
 	defer util.Recover("StartAdminBot")
 
+	// register commands
+	adminBot = connect(token)
+	commands := []tgbotapi.BotCommand{
+		{Command: "start", Description: "Получить ваш chat ID"},
+		{Command: "help", Description: "Показать справку по командам"},
+		{Command: "update", Description: "Обновить фрагмент: /update <id> <текст>"},
+		{Command: "delete", Description: "Удалить фрагмент: /delete <id>"},
+	}
+
+	_, err := adminBot.Request(tgbotapi.NewSetMyCommands(commands...))
+	if err != nil {
+		log.Printf("Ошибка при регистрации команд: %v", err)
+	}
+
 	adminBot = connect(token)
 	log.Println("Admin bot connected to Telegram API")
 
@@ -42,7 +56,7 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 		chatID := update.Message.Chat.ID
 		text := strings.TrimSpace(update.Message.Text)
 
-		if text == "/myid" {
+		if text == "/myid" || text == "/start" {
 			replyToAdmin(chatID, fmt.Sprintf(msgAdminMyIDFormat, chatID))
 			continue
 		}
@@ -97,7 +111,7 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 				continue
 			}
 			if id != 0 {
-				replyToAdmin(chatID, fmt.Sprintf(msgAdminAdded, id, content))
+				SendToAllAdmins(fmt.Sprintf(msgAdminAdded, id, content))
 			} else {
 				replyToAdmin(chatID, msgAdminExists)
 			}
