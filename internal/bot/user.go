@@ -20,6 +20,12 @@ type contactState struct {
 	Name  string
 }
 
+const (
+	actionCallManager = "CALL_MANAGER"
+	actionConfirmYes  = "CONFIRM_YES"
+	actionConfirmNo   = "CONFIRM_NO"
+)
+
 const chatUrlFormat = "%s/chat/%s"
 
 var (
@@ -82,6 +88,21 @@ func handleUserMessage(update tgbotapi.Update) {
 		case 2:
 			requestUserPhoneNumber(chatID, userText)
 			return
+		case 3:
+			lower := strings.ToLower(userText)
+			if strings.Contains(lower, "да") {
+				conversation.AppendHistory(repo, chatID, "user", historyConfirmYes)
+				finalizeContactRequest(chatID)
+				return
+			}
+			if strings.Contains(lower, "нет") {
+				conversation.AppendHistory(repo, chatID, "user", historyConfirmNo)
+				stateMu.Lock()
+				contactSteps[chatID] = &contactState{Stage: 1}
+				stateMu.Unlock()
+				replyToUser(chatID, msgAskName)
+				return
+			}
 		}
 	}
 
@@ -93,8 +114,8 @@ func handleUserMessage(update tgbotapi.Update) {
 
 	answer, err := handler.ProcessQuestionWithHistory(repo, aiClient, chatID, userText)
 	if err != nil {
-		SendToAllAdmins(fmt.Sprintf("Возникла ошибка: %s", err))
-		answer = "Возникла ошибка. Пожалуйста, попробуйте повторить ваш запрос позднее."
+		SendToAllAdmins(fmt.Sprintf(msgAdminErrorFormat, err))
+		answer = msgUserError
 	} else {
 		lowerAnswer := strings.ToLower(answer)
 		if util.ContainsStringFromSlice(lowerAnswer, config.Settings.CallManagerTriggerWordsInAnswer) {
@@ -117,8 +138,17 @@ func handleCallbackQuery(update tgbotapi.Update) {
 
 	// Handle actions
 	switch data {
-	case "CALL_MANAGER":
+	case actionCallManager:
 		callManagerAction(chatID)
+	case actionConfirmYes:
+		conversation.AppendHistory(repo, chatID, "user", historyConfirmYes)
+		finalizeContactRequest(chatID)
+	case actionConfirmNo:
+		conversation.AppendHistory(repo, chatID, "user", historyConfirmNo)
+		stateMu.Lock()
+		contactSteps[chatID] = &contactState{Stage: 1}
+		stateMu.Unlock()
+		replyToUser(chatID, msgAskName)
 	default:
 		log.Printf("Unknown CallbackQuery data: %s", data)
 	}
