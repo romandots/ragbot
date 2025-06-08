@@ -101,7 +101,7 @@ if [ "$USE_SSL" = false ]; then
     export CERTBOT_STAGING="${CERTBOT_STAGING:-}"  # Remove --staging for production
 
     # Run certbot to obtain certificates using a one-time container
-    docker compose run --rm certbot certbot certonly --webroot -w /var/www/certbot \
+    docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
         --email "$SSL_EMAIL" \
         -d "$DOMAIN_NAME" \
         --rsa-key-size 4096 \
