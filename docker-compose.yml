@@ -83,39 +83,32 @@ services:
 
   certbot:
     image: certbot/certbot
+    profiles: ["ssl"]
     volumes:
       - ./certbot/conf:/etc/letsencrypt
       - ./certbot/www:/var/www/certbot
-    profiles:
-      - ssl
-    depends_on:
-      nginx:
-        condition: service_healthy
-    command: >
+    command: |
       /bin/sh -c "
-        echo 'Waiting 30 seconds for nginx to be fully ready...' &&
-        sleep 30 &&
-        if [ ! -f /etc/letsencrypt/live/${DOMAIN_NAME}/fullchain.pem ]; then
-          echo 'Obtaining SSL certificate for ${DOMAIN_NAME}...' &&
-          certbot certonly --webroot -w /var/www/certbot \
-            --email ${SSL_EMAIL:-admin@${DOMAIN_NAME}} \
-            -d ${DOMAIN_NAME} \
-            --rsa-key-size 4096 \
-            --agree-tos \
-            --non-interactive \
-            ${CERTBOT_STAGING:---staging}
-        else
-          echo 'SSL certificate already exists.'
-        fi &&
-        # Start renewal daemon
-        trap exit TERM; 
-        while :; do 
-          certbot renew --webroot -w /var/www/certbot; 
-          sleep 12h & wait \$\${!}; 
-        done
+      echo 'Waiting 30 seconds for nginx to be fully ready...' &&
+      sleep 30 &&
+      if [ ! -f /etc/letsencrypt/live/$${DOMAIN_NAME}/fullchain.pem ]; then
+        echo 'Obtaining SSL certificate for $${DOMAIN_NAME}...' &&
+        certbot certonly --webroot -w /var/www/certbot \
+          --email $${SSL_EMAIL:-admin@$${DOMAIN_NAME}} \
+          -d $${DOMAIN_NAME} \
+          --rsa-key-size 4096 \
+          --agree-tos \
+          --non-interactive \
+          $${CERTBOT_STAGING:---staging}
+      else
+        echo 'SSL certificate already exists.'
+      fi &&
+      trap exit TERM; 
+      while :; do 
+        certbot renew --webroot -w /var/www/certbot; 
+        sleep 12h & wait $$$$!; 
+      done
       "
-    networks:
-      - app-network
     environment:
       - DOMAIN_NAME=${DOMAIN_NAME}
       - SSL_EMAIL=${SSL_EMAIL}
