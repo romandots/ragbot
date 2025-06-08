@@ -3,6 +3,7 @@ package amo
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"ragbot/internal/config"
 	"ragbot/internal/conversation"
+	"ragbot/internal/repository"
 	"strings"
 	"time"
 )
@@ -106,12 +108,12 @@ type contactResponse struct {
 }
 
 // SendLeadToAMO creates a lead in amoCRM using the API v4.
-func SendLeadToAMO(info *conversation.ChatInfo, link string) error {
-	return defaultClient.SendLeadToAMO(info, link)
+func SendLeadToAMO(repo *repository.Repository, info *conversation.ChatInfo, link string) error {
+	return defaultClient.SendLeadToAMO(repo, info, link)
 }
 
 // SendLeadToAMO создает лид в amoCRM используя API v4
-func (c *AmoClient) SendLeadToAMO(info *conversation.ChatInfo, link string) error {
+func (c *AmoClient) SendLeadToAMO(repo *repository.Repository, info *conversation.ChatInfo, link string) error {
 	if config.Config.AmoDomain == "" || config.Config.AmoAccessToken == "" {
 		log.Println("AMO integration not configured")
 		return nil
@@ -131,8 +133,18 @@ func (c *AmoClient) SendLeadToAMO(info *conversation.ChatInfo, link string) erro
 		}
 	}
 
-	// Create contact
-	cont, err := c.createContact(ctx, info.Name.String, info.Phone.String)
+	var cont *savedContact
+	var err error
+	if info.AmoContactID.Valid {
+		cont = &savedContact{ID: int(info.AmoContactID.Int64)}
+	} else {
+		cont, err = c.createContact(ctx, info.Name.String, info.Phone.String)
+		if err != nil {
+			errMsg := fmt.Sprintf("Failed to create a contact: %s", err)
+			return errors.New(errMsg)
+		}
+		_ = repo.UpdateAmoContactID(ctx, info.ChatID, sql.NullInt64{Int64: int64(cont.ID), Valid: true})
+	}
 
 	// Create lead
 	_, err = c.createLead(ctx, info.Title.String, cont, info.Summary.String, link, branches)

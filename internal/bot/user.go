@@ -97,6 +97,7 @@ func handleUserMessage(update tgbotapi.Update) {
 			}
 			if strings.Contains(lower, "нет") {
 				conversation.AppendHistory(repo, chatID, "user", historyConfirmNo)
+				conversation.ClearAmoContactID(repo, chatID)
 				stateMu.Lock()
 				contactSteps[chatID] = &contactState{Stage: 1}
 				stateMu.Unlock()
@@ -145,6 +146,7 @@ func handleCallbackQuery(update tgbotapi.Update) {
 		finalizeContactRequest(chatID)
 	case actionConfirmNo:
 		conversation.AppendHistory(repo, chatID, "user", historyConfirmNo)
+		conversation.ClearAmoContactID(repo, chatID)
 		stateMu.Lock()
 		contactSteps[chatID] = &contactState{Stage: 1}
 		stateMu.Unlock()

@@ -131,13 +131,14 @@ func (r *Repository) UpdateChunkWithCreatedAt(ctx context.Context, id int, conte
 // --- conversation operations ---
 
 type ChatInfo struct {
-	ID       string
-	ChatID   int64
-	Title    sql.NullString
-	Summary  sql.NullString
-	Interest sql.NullString
-	Name     sql.NullString
-	Phone    sql.NullString
+	ID           string
+	ChatID       int64
+	Title        sql.NullString
+	Summary      sql.NullString
+	Interest     sql.NullString
+	Name         sql.NullString
+	Phone        sql.NullString
+	AmoContactID sql.NullInt64
 }
 
 type HistoryItem struct {
@@ -157,7 +158,8 @@ func (r *Repository) EnsureSession(ctx context.Context, chatID int64) (string, e
 func (r *Repository) GetChatInfoByChatID(ctx context.Context, chatID int64) (ChatInfo, error) {
 	var info ChatInfo
 	err := r.db.QueryRowContext(ctx,
-		`SELECT uuid, summary, title, interest, name, phone FROM conversations WHERE chat_id=$1`, chatID).Scan(&info.ID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone)
+		`SELECT uuid, summary, title, interest, name, phone, amo_contact_id FROM conversations WHERE chat_id=$1`, chatID).
+		Scan(&info.ID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone, &info.AmoContactID)
 	if err != nil {
 		return info, err
 	}
@@ -168,7 +170,8 @@ func (r *Repository) GetChatInfoByChatID(ctx context.Context, chatID int64) (Cha
 func (r *Repository) GetChatInfoByUUID(ctx context.Context, uuid string) (ChatInfo, error) {
 	var info ChatInfo
 	err := r.db.QueryRowContext(ctx,
-		`SELECT chat_id, summary, title, interest, name, phone FROM conversations WHERE uuid=$1`, uuid).Scan(&info.ChatID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone)
+		`SELECT chat_id, summary, title, interest, name, phone, amo_contact_id FROM conversations WHERE uuid=$1`, uuid).
+		Scan(&info.ChatID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone, &info.AmoContactID)
 	if err != nil {
 		return info, err
 	}
@@ -191,6 +194,12 @@ func (r *Repository) UpdateName(ctx context.Context, chatID int64, name string) 
 func (r *Repository) UpdatePhone(ctx context.Context, chatID int64, phone string) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE conversations SET phone=$1, updated_at=NOW() WHERE chat_id=$2`, phone, chatID)
+	return err
+}
+
+func (r *Repository) UpdateAmoContactID(ctx context.Context, chatID int64, contactID sql.NullInt64) error {
+	_, err := r.db.ExecContext(ctx,
+		`UPDATE conversations SET amo_contact_id=$1, updated_at=NOW() WHERE chat_id=$2`, contactID, chatID)
 	return err
 }
 
