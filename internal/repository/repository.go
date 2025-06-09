@@ -132,6 +132,26 @@ func (r *Repository) UpdateChunkWithCreatedAt(ctx context.Context, id int, conte
 	return err
 }
 
+// ListChunksWithoutExtID returns all chunks that don't have an external ID.
+func (r *Repository) ListChunksWithoutExtID(ctx context.Context) ([]models.Chunk, error) {
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT id, content FROM chunks WHERE ext_id IS NULL ORDER BY id")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var chunks []models.Chunk
+	for rows.Next() {
+		var c models.Chunk
+		if err := rows.Scan(&c.ID, &c.Content); err != nil {
+			return chunks, err
+		}
+		chunks = append(chunks, c)
+	}
+	return chunks, nil
+}
+
 // --- conversation operations ---
 
 type ChatInfo struct {

@@ -29,6 +29,7 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 		{Command: "help", Description: "Показать справку по командам"},
 		{Command: "update", Description: "Обновить фрагмент: /update <id> <текст>"},
 		{Command: "delete", Description: "Удалить фрагмент: /delete <id>"},
+		{Command: "list", Description: "Показать все фрагменты"},
 	}
 
 	_, err := adminBot.Request(tgbotapi.NewSetMyCommands(commands...))
@@ -52,67 +53,88 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 			continue
 		}
 		chatID := update.Message.Chat.ID
-		text := strings.TrimSpace(update.Message.Text)
-
-		if text == "/myid" || text == "/start" {
-			replyToAdmin(chatID, fmt.Sprintf(msgAdminMyIDFormat, chatID))
-			continue
-		}
-
-		if strings.HasPrefix(text, "/help") {
-			replyToAdmin(chatID, msgAdminHelp)
-			continue
-		}
 
 		if !allowed[chatID] {
 			continue
 		}
 
-		switch {
-		case strings.HasPrefix(text, "/delete "):
-			idStr := strings.TrimPrefix(text, "/delete ")
-			id, err := strconv.Atoi(idStr)
-			if err != nil {
-				replyToAdmin(chatID, msgAdminInvalidID)
-				continue
-			}
-			content, err := repo.DeleteChunk(context.Background(), id)
-			if err != nil {
-				replyToAdmin(chatID, fmt.Sprintf(msgAdminDeleteError, id))
-				continue
-			}
-			replyToAdmin(chatID, fmt.Sprintf(msgAdminDeletedFormat, id, content))
+		if update.Message.IsCommand() {
+			cmd := update.Message.Command()
+			args := update.Message.CommandArguments()
 
-		case strings.HasPrefix(text, "/update "):
-			parts := strings.SplitN(strings.TrimPrefix(text, "/update "), " ", 2)
-			if len(parts) < 2 {
-				replyToAdmin(chatID, msgAdminUpdateUsage)
+			switch cmd {
+			case "start", "myid":
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminMyIDFormat, chatID))
+				continue
+			case "help":
+				replyToAdmin(chatID, msgAdminHelp)
+				continue
+			case "delete":
+				idStr := strings.Fields(args)
+				if len(idStr) == 0 {
+					replyToAdmin(chatID, msgAdminInvalidID)
+					continue
+				}
+				id, err := strconv.Atoi(idStr[0])
+				if err != nil {
+					replyToAdmin(chatID, msgAdminInvalidID)
+					continue
+				}
+				content, err := repo.DeleteChunk(context.Background(), id)
+				if err != nil {
+					replyToAdmin(chatID, fmt.Sprintf(msgAdminDeleteError, id))
+					continue
+				}
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminDeletedFormat, id, content))
+				continue
+			case "update":
+				parts := strings.SplitN(args, " ", 2)
+				if len(parts) < 2 {
+					replyToAdmin(chatID, msgAdminUpdateUsage)
+					continue
+				}
+				id, err := strconv.Atoi(parts[0])
+				if err != nil {
+					replyToAdmin(chatID, msgAdminInvalidID)
+					continue
+				}
+				content := parts[1]
+				if err := repo.UpdateChunk(context.Background(), id, content); err != nil {
+					replyToAdmin(chatID, fmt.Sprintf(msgAdminUpdateError, id, content))
+					continue
+				}
+				replyToAdmin(chatID, fmt.Sprintf(msgAdminUpdatedFormat, id, content))
+				continue
+			case "list":
+				chunks, err := repo.ListChunksWithoutExtID(context.Background())
+				if err != nil {
+					replyToAdmin(chatID, fmt.Sprintf("Ошибка получения списка: %v", err))
+					continue
+				}
+				var sb strings.Builder
+				sb.WriteString("| id | content |\n")
+				sb.WriteString("| --- | --- |\n")
+				for _, c := range chunks {
+					sb.WriteString(fmt.Sprintf("| %d | %s |\n", c.ID, c.Content))
+				}
+				msg := tgbotapi.NewMessage(chatID, sb.String())
+				msg.ParseMode = tgbotapi.ModeMarkdown
+				adminBot.Send(msg)
 				continue
 			}
-			id, err := strconv.Atoi(parts[0])
-			if err != nil {
-				replyToAdmin(chatID, msgAdminInvalidID)
-				continue
-			}
-			content := parts[1]
-			if err := repo.UpdateChunk(context.Background(), id, content); err != nil {
-				replyToAdmin(chatID, fmt.Sprintf(msgAdminUpdateError, id, content))
-				continue
-			}
-			replyToAdmin(chatID, fmt.Sprintf(fmt.Sprintf(msgAdminUpdatedFormat, id, content)))
+		}
 
-		default:
-			content := strings.Trim(text, " ")
-			id, err := repo.AddChunk(context.Background(), content, source)
-			if err != nil {
-				replyToAdmin(chatID, fmt.Sprintf(msgAdminAddError, content))
-				continue
-			}
-			if id != 0 {
-				SendToAllAdmins(fmt.Sprintf(msgAdminAdded, id, content))
-			} else {
-				replyToAdmin(chatID, msgAdminExists)
-			}
+		text := strings.TrimSpace(update.Message.Text)
+		content := strings.Trim(text, " ")
+		id, err := repo.AddChunk(context.Background(), content, source)
+		if err != nil {
+			replyToAdmin(chatID, fmt.Sprintf(msgAdminAddError, content))
+			continue
+		}
+		if id != 0 {
+			SendToAllAdmins(fmt.Sprintf(msgAdminAdded, id, content))
+		} else {
+			replyToAdmin(chatID, msgAdminExists)
 		}
 	}
 }
