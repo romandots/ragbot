@@ -102,22 +102,8 @@ func handleUserMessage(update tgbotapi.Update) {
 		}
 	}()
 
-	if update.Message.IsCommand() {
-		switch update.Message.Command() {
-		case "address":
-			sendAddresses(chatID)
-			return
-		case "prices":
-			sendPrices(chatID)
-			return
-		case "rasp":
-			sendSchedule(chatID)
-			return
-		case "call":
-			userBot.Send(callMeBackButton(chatID))
-			return
-		default:
-		}
+	if handleUserCommand(update, chatID) {
+		return
 	}
 
 	stateMu.Lock()
@@ -169,6 +155,27 @@ func handleUserMessage(update tgbotapi.Update) {
 	}
 
 	replyToUser(chatID, answer)
+}
+
+func handleUserCommand(update tgbotapi.Update, chatID int64) bool {
+	if update.Message.IsCommand() {
+		switch update.Message.Command() {
+		case "address":
+			sendAddresses(chatID)
+			return true
+		case "prices":
+			sendPrices(chatID)
+			return true
+		case "rasp":
+			sendSchedule(chatID)
+			return true
+		case "call":
+			userBot.Send(callMeBackButton(chatID))
+			return true
+		default:
+		}
+	}
+	return false
 }
 
 func sendAddresses(chatID int64) {
