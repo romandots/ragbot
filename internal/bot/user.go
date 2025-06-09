@@ -41,15 +41,20 @@ var (
 )
 
 // StartUserBot launches Telegram bot for users.
-func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string) {
+func StartUserBot(r *repository.Repository, ac *ai.AIClient, tc *tansultant.Client, token string) {
 	defer util.Recover("StartUserBot")
 
-	aiClient = AIClient
+	aiClient = ac
+	tansClient = tc
 	repo = r
 	userBot = connect(token)
-	tansClient = tansultant.NewClient()
 	log.Println("User bot connected to Telegram API")
 
+	registerUserCommands()
+	handleUserUpdates()
+}
+
+func handleUserUpdates() {
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = 60
 	updates := userBot.GetUpdatesChan(u)
@@ -69,27 +74,26 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 	}
 }
 
+func registerUserCommands() {
+	commands := []tgbotapi.BotCommand{
+		{Command: "start", Description: "Начать общение с ассистентом"},
+		{Command: "address", Description: "Показать адреса студий"},
+		{Command: "prices", Description: "Показать цены на обучение"},
+		{Command: "rasp", Description: "Показать расписание занятий"},
+		{Command: "call", Description: "Заказать обратный звонок от менеджера"},
+	}
+
+	_, err := userBot.Request(tgbotapi.NewSetMyCommands(commands...))
+	if err != nil {
+		log.Printf("Failed registering commands for user bot: %v", err)
+	}
+}
+
 func handleUserMessage(update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
 	conversation.EnsureSession(repo, chatID)
 	userText := update.Message.Text
 	var answer string
-
-	if update.Message.IsCommand() {
-		switch update.Message.Command() {
-		case "address":
-			sendAddresses(chatID)
-		case "prices":
-			sendPrices(chatID)
-		case "rasp":
-			sendSchedule(chatID)
-		case "call":
-			userBot.Send(callMeBackButton(chatID))
-		default:
-			replyToUser(chatID, msgUnknownCommand)
-		}
-		return
-	}
 
 	defer func() {
 		conversation.AppendHistory(repo, chatID, "user", userText)
@@ -97,6 +101,24 @@ func handleUserMessage(update tgbotapi.Update) {
 			conversation.AppendHistory(repo, chatID, "assistant", answer)
 		}
 	}()
+
+	if update.Message.IsCommand() {
+		switch update.Message.Command() {
+		case "address":
+			sendAddresses(chatID)
+			return
+		case "prices":
+			sendPrices(chatID)
+			return
+		case "rasp":
+			sendSchedule(chatID)
+			return
+		case "call":
+			userBot.Send(callMeBackButton(chatID))
+			return
+		default:
+		}
+	}
 
 	stateMu.Lock()
 	st, ok := contactSteps[chatID]
@@ -151,17 +173,19 @@ func handleUserMessage(update tgbotapi.Update) {
 
 func sendAddresses(chatID int64) {
 	if tansClient == nil {
+		log.Printf("Failed retrieving addresses: Tansultant client is not instantiated")
 		replyToUser(chatID, msgServiceUnavailable)
 		return
 	}
 	branches, err := tansClient.Branches()
 	if err != nil || len(branches) == 0 {
+		log.Printf("Failed retrieving addresses: %s", err.Error())
 		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
 	var sb strings.Builder
 	for _, b := range branches {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", b.Title, b.Address))
+		sb.WriteString(fmt.Sprintf(msgAddressFormat, b.Title, b.Address))
 	}
 	replyToUser(chatID, sb.String())
 }
@@ -173,13 +197,14 @@ func sendSchedule(chatID int64) {
 	}
 	branches, err := tansClient.Branches()
 	if err != nil || len(branches) == 0 {
+		log.Printf("Failed retrieving schedule: %s", err.Error())
 		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, b := range branches {
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL(b.Title, b.ScheduleLink),
+			tgbotapi.NewInlineKeyboardButtonURL(fmt.Sprintf(msgScheduleLinkFormat, b.Title), b.ScheduleLink),
 		))
 	}
 	msg := tgbotapi.NewMessage(chatID, msgScheduleTitle)
@@ -194,6 +219,7 @@ func sendPrices(chatID int64) {
 	}
 	prices, err := tansClient.Prices()
 	if err != nil || len(prices) == 0 {
+		log.Printf("Failed retrieving prices: %s", err.Error())
 		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
@@ -202,8 +228,26 @@ func sendPrices(chatID int64) {
 	priceMap = make(map[string]string)
 	for i, p := range prices {
 		key := fmt.Sprintf("PRICE_%d", i)
-		priceMap[key] = p.Description
-		label := fmt.Sprintf("%s - %d", p.Name, p.Price)
+		properties := ""
+		if p.Hours != "" {
+			properties = properties + fmt.Sprintf(msgPassHoursFormat, p.Hours)
+		}
+		if p.GuestVisits != "" {
+			properties = properties + fmt.Sprintf(msgGuestVisitsFormat, p.GuestVisits)
+		}
+		if p.FreezeAllowed != "" {
+			properties = properties + msgPassFreezeAllowed
+		}
+		if p.Lifetime != "" {
+			properties = properties + fmt.Sprintf(msgPassLifetimeFormat, p.Lifetime)
+		}
+		properties = tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, properties)
+		if p.Price != "" {
+			properties = properties + fmt.Sprintf(msgPriceFormat, p.Price)
+		}
+		description := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, p.Description)
+		priceMap[key] = fmt.Sprintf(msgPriceDescriptionFormat, p.Name, description, properties)
+		label := fmt.Sprintf(msgPriceButtonFormat, p.Name, p.Price)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(label, key),
 		))
@@ -243,7 +287,7 @@ func handleCallbackQuery(update tgbotapi.Update) {
 			desc := priceMap[data]
 			priceMu.RUnlock()
 			if desc != "" {
-				replyToUser(chatID, desc)
+				replyToUserMarkdownV2(chatID, desc)
 			} else {
 				log.Printf("Unknown price callback: %s", data)
 			}
@@ -255,5 +299,17 @@ func handleCallbackQuery(update tgbotapi.Update) {
 
 func replyToUser(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
-	userBot.Send(msg)
+	_, err := userBot.Send(msg)
+	if err != nil {
+		log.Printf("Error sending message: %s", err.Error())
+	}
+}
+
+func replyToUserMarkdownV2(chatID int64, message string) {
+	msg := tgbotapi.NewMessage(chatID, message)
+	msg.ParseMode = tgbotapi.ModeMarkdownV2
+	_, err := userBot.Send(msg)
+	if err != nil {
+		log.Printf("Error sending message: %s", err.Error())
+	}
 }

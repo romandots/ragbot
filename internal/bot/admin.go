@@ -24,19 +24,11 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 	adminBot = connect(token)
 	log.Println("Admin bot connected to Telegram API")
 
-	commands := []tgbotapi.BotCommand{
-		{Command: "start", Description: "Получить ваш chat ID"},
-		{Command: "help", Description: "Показать справку по командам"},
-		{Command: "update", Description: "Обновить фрагмент: /update <id> <текст>"},
-		{Command: "delete", Description: "Удалить фрагмент: /delete <id>"},
-		{Command: "list", Description: "Показать все фрагменты"},
-	}
+	registerAdminCommands()
+	handleAdminUpdates(repo, allowedIDs)
+}
 
-	_, err := adminBot.Request(tgbotapi.NewSetMyCommands(commands...))
-	if err != nil {
-		log.Printf("Failed registering commands: %v", err)
-	}
-
+func handleAdminUpdates(repo *repository.Repository, allowedIDs []int64) {
 	adminChats = allowedIDs
 	allowed := make(map[int64]bool)
 	for _, id := range allowedIDs {
@@ -136,6 +128,21 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 	}
 }
 
+func registerAdminCommands() {
+	commands := []tgbotapi.BotCommand{
+		{Command: "start", Description: "Получить ваш chat ID"},
+		{Command: "help", Description: "Показать справку по командам"},
+		{Command: "update", Description: "Обновить фрагмент: /update <id> <текст>"},
+		{Command: "delete", Description: "Удалить фрагмент: /delete <id>"},
+		{Command: "list", Description: "Показать все фрагменты"},
+	}
+
+	_, err := adminBot.Request(tgbotapi.NewSetMyCommands(commands...))
+	if err != nil {
+		log.Printf("Failed registering commands: %v", err)
+	}
+}
+
 func SendToAllAdmins(message string) {
 	for _, adminChatID := range adminChats {
 		replyToAdmin(adminChatID, message)
@@ -144,11 +151,17 @@ func SendToAllAdmins(message string) {
 
 func replyToAdmin(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
-	adminBot.Send(msg)
+	_, err := adminBot.Send(msg)
+	if err != nil {
+		log.Printf("Error sending message: %s", err.Error())
+	}
 }
 
 func replyToAdminMarkdownV2(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
-	adminBot.Send(msg)
+	_, err := adminBot.Send(msg)
+	if err != nil {
+		log.Printf("Error sending message: %s", err.Error())
+	}
 }

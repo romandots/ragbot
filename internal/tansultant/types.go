@@ -14,12 +14,12 @@ type Branch struct {
 // Price represents a subscription pass with its price and description.
 // Only fields listed here are parsed from the API response.
 type Price struct {
-	ID            int    `json:"id"`
+	ID            string `json:"id"`
 	Name          string `json:"name"`
 	Description   string `json:"description"`
-	Price         int    `json:"price"`
-	Lifetime      int    `json:"lifetime"`
-	Hours         int    `json:"hours"`
-	FreezeAllowed int    `json:"freeze_allowed"`
-	GuestVisits   int    `json:"guest_visits"`
+	Price         string `json:"price"`
+	Lifetime      string `json:"lifetime"`
+	Hours         string `json:"hours"`
+	FreezeAllowed string `json:"freeze_allowed"`
+	GuestVisits   string `json:"guest_visits"`
 }
