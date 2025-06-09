@@ -252,8 +252,9 @@ func sendPrices(chatID int64) {
 		if p.Price != "" {
 			properties = properties + fmt.Sprintf(msgPriceFormat, p.Price)
 		}
+		name := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, p.Name)
 		description := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, p.Description)
-		priceMap[key] = fmt.Sprintf(msgPriceDescriptionFormat, p.Name, description, properties)
+		priceMap[key] = fmt.Sprintf(msgPriceDescriptionFormat, name, description, properties)
 		label := fmt.Sprintf(msgPriceButtonFormat, p.Name, p.Price)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(label, key),
