@@ -95,7 +95,7 @@ func (y *YandexYMLSource) process(repo *repository.Repository) {
 		}
 
 		extID := offer.CategoryID + ":" + offer.ID
-		id, createdAt, found, err := repo.GetChunkByExtID(context.Background(), yandexSource, extID)
+		id, createdAt, oldContent, found, err := repo.GetChunkByExtID(context.Background(), yandexSource, extID)
 		if err != nil {
 			log.Printf("yandex.yml select error: %v", err)
 			continue
@@ -110,11 +110,20 @@ func (y *YandexYMLSource) process(repo *repository.Repository) {
 			continue
 		}
 		if pubDate.After(createdAt) {
-			err = repo.UpdateChunkWithCreatedAt(context.Background(), id, content, pubDate)
-			if err != nil {
-				log.Printf("yandex.yml update error: %v", err)
+			if oldContent == content {
+				err = repo.UpdateChunkCreatedAt(context.Background(), id, pubDate)
+				if err != nil {
+					log.Printf("yandex.yml date update error: %v", err)
+				} else {
+					log.Printf("Chunk date updated from yandex.yml: %s", extID)
+				}
 			} else {
-				log.Printf("Chunk updated from yandex.yml: %s", extID)
+				err = repo.UpdateChunkWithCreatedAt(context.Background(), id, content, pubDate)
+				if err != nil {
+					log.Printf("yandex.yml update error: %v", err)
+				} else {
+					log.Printf("Chunk updated from yandex.yml: %s", extID)
+				}
 			}
 		}
 	}

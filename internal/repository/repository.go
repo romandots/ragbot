@@ -102,18 +102,18 @@ func (r *Repository) SearchChunks(ctx context.Context, vec []float32, limit int)
 	return out, nil
 }
 
-func (r *Repository) GetChunkByExtID(ctx context.Context, source, extID string) (id int, createdAt time.Time, found bool, err error) {
+func (r *Repository) GetChunkByExtID(ctx context.Context, source, extID string) (id int, createdAt time.Time, content string, found bool, err error) {
 	err = r.db.QueryRowContext(ctx,
-		"SELECT id, created_at FROM chunks WHERE source=$1 AND ext_id=$2",
+		"SELECT id, created_at, content FROM chunks WHERE source=$1 AND ext_id=$2",
 		source, extID,
-	).Scan(&id, &createdAt)
+	).Scan(&id, &createdAt, &content)
 	if err == sql.ErrNoRows {
-		return 0, time.Time{}, false, nil
+		return 0, time.Time{}, "", false, nil
 	}
 	if err != nil {
-		return 0, time.Time{}, false, err
+		return 0, time.Time{}, "", false, err
 	}
-	return id, createdAt, true, nil
+	return id, createdAt, content, true, nil
 }
 
 func (r *Repository) InsertChunkWithExtID(ctx context.Context, content, source, extID string, createdAt time.Time) error {
@@ -128,6 +128,14 @@ func (r *Repository) UpdateChunkWithCreatedAt(ctx context.Context, id int, conte
 	_, err := r.db.ExecContext(ctx,
 		"UPDATE chunks SET content=$1, created_at=$2, embedding=NULL, processed_at=NULL WHERE id=$3",
 		content, createdAt, id,
+	)
+	return err
+}
+
+func (r *Repository) UpdateChunkCreatedAt(ctx context.Context, id int, createdAt time.Time) error {
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE chunks SET created_at=$1 WHERE id=$2",
+		createdAt, id,
 	)
 	return err
 }
