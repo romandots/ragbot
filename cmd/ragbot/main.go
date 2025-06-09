@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"ragbot/internal/tansultant"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -31,10 +32,11 @@ func main() {
 	repo := repository.New(database)
 
 	aiClient := ai.NewAIClient()
+	tansClient := tansultant.NewClient()
 
 	go handler.StartHTTP(repo, aiClient)
 
-	go bot.StartUserBot(repo, aiClient, cfg.UserTelegramToken)
+	go bot.StartUserBot(repo, aiClient, tansClient, cfg.UserTelegramToken)
 
 	startEducationSourcesHandlers(cfg, repo)
 
