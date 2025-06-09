@@ -44,6 +44,11 @@ const (
 	msgAdminAddError      = "Ошибка добавления фрагмента: %s"
 	msgAdminAdded         = "Добавлен фрагмент #%d: %s"
 	msgAdminExists        = "Фрагмент уже существует: %s"
+	msgUnknownCommand     = "Неизвестная команда"
+	msgServiceUnavailable = "Service unavailable"
+	msgInfoUnavailable    = "Информация недоступна"
+	msgScheduleTitle      = "Расписание занятий:"
+	msgPricesTitle        = "Цены на обучение:"
 )
 
 const (

@@ -50,22 +50,18 @@ func (c *Client) request(url string, v interface{}) error {
 
 // Branches returns available branches from the API.
 func (c *Client) Branches() ([]Branch, error) {
-	var res struct {
-		Branches []Branch `json:"branches"`
-	}
-	if err := c.request(c.addressEndpoint, &res); err != nil {
+	var branches []Branch
+	if err := c.request(c.addressEndpoint, &branches); err != nil {
 		return nil, err
 	}
-	return res.Branches, nil
+	return branches, nil
 }
 
 // Prices returns available passes and prices from the API.
 func (c *Client) Prices() ([]Price, error) {
-	var res struct {
-		Prices []Price `json:"prices"`
-	}
-	if err := c.request(c.pricesEndpoint, &res); err != nil {
+	var prices []Price
+	if err := c.request(c.pricesEndpoint, &prices); err != nil {
 		return nil, err
 	}
-	return res.Prices, nil
+	return prices, nil
 }

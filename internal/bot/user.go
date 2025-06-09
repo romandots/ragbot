@@ -86,7 +86,7 @@ func handleUserMessage(update tgbotapi.Update) {
 		case "call":
 			userBot.Send(callMeBackButton(chatID))
 		default:
-			replyToUser(chatID, "Неизвестная команда")
+			replyToUser(chatID, msgUnknownCommand)
 		}
 		return
 	}
@@ -151,50 +151,50 @@ func handleUserMessage(update tgbotapi.Update) {
 
 func sendAddresses(chatID int64) {
 	if tansClient == nil {
-		replyToUser(chatID, "Service unavailable")
+		replyToUser(chatID, msgServiceUnavailable)
 		return
 	}
 	branches, err := tansClient.Branches()
 	if err != nil || len(branches) == 0 {
-		replyToUser(chatID, "Информация недоступна")
+		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
 	var sb strings.Builder
 	for _, b := range branches {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", b.Name, b.Address))
+		sb.WriteString(fmt.Sprintf("%s: %s\n", b.Title, b.Address))
 	}
 	replyToUser(chatID, sb.String())
 }
 
 func sendSchedule(chatID int64) {
 	if tansClient == nil {
-		replyToUser(chatID, "Service unavailable")
+		replyToUser(chatID, msgServiceUnavailable)
 		return
 	}
 	branches, err := tansClient.Branches()
 	if err != nil || len(branches) == 0 {
-		replyToUser(chatID, "Информация недоступна")
+		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, b := range branches {
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL(b.Name, b.ScheduleURL),
+			tgbotapi.NewInlineKeyboardButtonURL(b.Title, b.ScheduleLink),
 		))
 	}
-	msg := tgbotapi.NewMessage(chatID, "Расписание занятий:")
+	msg := tgbotapi.NewMessage(chatID, msgScheduleTitle)
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
 	userBot.Send(msg)
 }
 
 func sendPrices(chatID int64) {
 	if tansClient == nil {
-		replyToUser(chatID, "Service unavailable")
+		replyToUser(chatID, msgServiceUnavailable)
 		return
 	}
 	prices, err := tansClient.Prices()
 	if err != nil || len(prices) == 0 {
-		replyToUser(chatID, "Информация недоступна")
+		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
 	var rows [][]tgbotapi.InlineKeyboardButton
@@ -203,13 +203,13 @@ func sendPrices(chatID int64) {
 	for i, p := range prices {
 		key := fmt.Sprintf("PRICE_%d", i)
 		priceMap[key] = p.Description
-		label := fmt.Sprintf("%s - %s", p.Name, p.Price)
+		label := fmt.Sprintf("%s - %d", p.Name, p.Price)
 		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(label, key),
 		))
 	}
 	priceMu.Unlock()
-	msg := tgbotapi.NewMessage(chatID, "Цены на обучение:")
+	msg := tgbotapi.NewMessage(chatID, msgPricesTitle)
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
 	userBot.Send(msg)
 }
