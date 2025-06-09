@@ -112,14 +112,11 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 					continue
 				}
 				var sb strings.Builder
-				sb.WriteString("| id | content |\n")
-				sb.WriteString("| --- | --- |\n")
 				for _, c := range chunks {
-					sb.WriteString(fmt.Sprintf("| %d | %s |\n", c.ID, c.Content))
+					escapedText := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, c.Content)
+					sb.WriteString(fmt.Sprintf("*%d* %s\n\n", c.ID, escapedText))
 				}
-				msg := tgbotapi.NewMessage(chatID, sb.String())
-				msg.ParseMode = tgbotapi.ModeMarkdown
-				adminBot.Send(msg)
+				replyToAdminMarkdownV2(chatID, sb.String())
 				continue
 			}
 		}
@@ -147,5 +144,11 @@ func SendToAllAdmins(message string) {
 
 func replyToAdmin(chatID int64, message string) {
 	msg := tgbotapi.NewMessage(chatID, message)
+	adminBot.Send(msg)
+}
+
+func replyToAdminMarkdownV2(chatID int64, message string) {
+	msg := tgbotapi.NewMessage(chatID, message)
+	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	adminBot.Send(msg)
 }
