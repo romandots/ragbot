@@ -12,6 +12,7 @@ import (
 	"ragbot/internal/conversation"
 	"ragbot/internal/handler"
 	"ragbot/internal/repository"
+	"ragbot/internal/tansultant"
 	"ragbot/internal/util"
 )
 
@@ -34,6 +35,9 @@ var (
 	userBot      *tgbotapi.BotAPI
 	repo         *repository.Repository
 	aiClient     *ai.AIClient
+	tansClient   *tansultant.Client
+	priceMu      sync.RWMutex
+	priceMap     = make(map[string]string)
 )
 
 // StartUserBot launches Telegram bot for users.
@@ -43,6 +47,7 @@ func StartUserBot(r *repository.Repository, AIClient *ai.AIClient, token string)
 	aiClient = AIClient
 	repo = r
 	userBot = connect(token)
+	tansClient = tansultant.NewClient()
 	log.Println("User bot connected to Telegram API")
 
 	u := tgbotapi.NewUpdate(0)
@@ -69,6 +74,22 @@ func handleUserMessage(update tgbotapi.Update) {
 	conversation.EnsureSession(repo, chatID)
 	userText := update.Message.Text
 	var answer string
+
+	if update.Message.IsCommand() {
+		switch update.Message.Command() {
+		case "address":
+			sendAddresses(chatID)
+		case "prices":
+			sendPrices(chatID)
+		case "rasp":
+			sendSchedule(chatID)
+		case "call":
+			userBot.Send(callMeBackButton(chatID))
+		default:
+			replyToUser(chatID, "Неизвестная команда")
+		}
+		return
+	}
 
 	defer func() {
 		conversation.AppendHistory(repo, chatID, "user", userText)
@@ -128,6 +149,71 @@ func handleUserMessage(update tgbotapi.Update) {
 	replyToUser(chatID, answer)
 }
 
+func sendAddresses(chatID int64) {
+	if tansClient == nil {
+		replyToUser(chatID, "Service unavailable")
+		return
+	}
+	branches, err := tansClient.Branches()
+	if err != nil || len(branches) == 0 {
+		replyToUser(chatID, "Информация недоступна")
+		return
+	}
+	var sb strings.Builder
+	for _, b := range branches {
+		sb.WriteString(fmt.Sprintf("%s: %s\n", b.Name, b.Address))
+	}
+	replyToUser(chatID, sb.String())
+}
+
+func sendSchedule(chatID int64) {
+	if tansClient == nil {
+		replyToUser(chatID, "Service unavailable")
+		return
+	}
+	branches, err := tansClient.Branches()
+	if err != nil || len(branches) == 0 {
+		replyToUser(chatID, "Информация недоступна")
+		return
+	}
+	var rows [][]tgbotapi.InlineKeyboardButton
+	for _, b := range branches {
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL(b.Name, b.ScheduleURL),
+		))
+	}
+	msg := tgbotapi.NewMessage(chatID, "Расписание занятий:")
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+	userBot.Send(msg)
+}
+
+func sendPrices(chatID int64) {
+	if tansClient == nil {
+		replyToUser(chatID, "Service unavailable")
+		return
+	}
+	prices, err := tansClient.Prices()
+	if err != nil || len(prices) == 0 {
+		replyToUser(chatID, "Информация недоступна")
+		return
+	}
+	var rows [][]tgbotapi.InlineKeyboardButton
+	priceMu.Lock()
+	priceMap = make(map[string]string)
+	for i, p := range prices {
+		key := fmt.Sprintf("PRICE_%d", i)
+		priceMap[key] = p.Description
+		label := fmt.Sprintf("%s - %s", p.Name, p.Price)
+		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(label, key),
+		))
+	}
+	priceMu.Unlock()
+	msg := tgbotapi.NewMessage(chatID, "Цены на обучение:")
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
+	userBot.Send(msg)
+}
+
 func handleCallbackQuery(update tgbotapi.Update) {
 	chatID := update.CallbackQuery.Message.Chat.ID
 	conversation.EnsureSession(repo, chatID)
@@ -152,7 +238,18 @@ func handleCallbackQuery(update tgbotapi.Update) {
 		stateMu.Unlock()
 		replyToUser(chatID, msgAskName)
 	default:
-		log.Printf("Unknown CallbackQuery data: %s", data)
+		if strings.HasPrefix(data, "PRICE_") {
+			priceMu.RLock()
+			desc := priceMap[data]
+			priceMu.RUnlock()
+			if desc != "" {
+				replyToUser(chatID, desc)
+			} else {
+				log.Printf("Unknown price callback: %s", data)
+			}
+		} else {
+			log.Printf("Unknown CallbackQuery data: %s", data)
+		}
 	}
 }
 
