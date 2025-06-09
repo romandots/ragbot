@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 )
 
@@ -18,11 +17,12 @@ type Client struct {
 
 // NewClient creates a client using environment variables.
 func NewClient() *Client {
+	loadConfig()
 	return &Client{
 		HTTPClient:      &http.Client{Timeout: 10 * time.Second},
-		token:           os.Getenv("TANSULTANT_API_ACCESS_TOKEN"),
-		addressEndpoint: os.Getenv("TANSULTANT_API_ADDRESS_ENDPOINT"),
-		pricesEndpoint:  os.Getenv("TANSULTANT_API_PRICES_ENDPOINT"),
+		token:           tansConfig.token,
+		addressEndpoint: tansConfig.addressEndpoint,
+		pricesEndpoint:  tansConfig.pricesEndpoint,
 	}
 }
 
