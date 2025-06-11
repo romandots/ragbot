@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"ragbot/internal/config"
 
@@ -66,38 +65,7 @@ func StartHTTP(repo *repository.Repository, aiClient *ai.AIClient) {
 
 	http.HandleFunc("/chat/", ChatHandler(repo))
 	http.HandleFunc("/chats", ChatsHandler(repo))
-
-	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != os.Getenv("STATS_USER") || pass != os.Getenv("STATS_PASS") {
-			w.Header().Set("WWW-Authenticate", "Basic realm=restricted")
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-		ctx := r.Context()
-		uniqueChats, _ := repo.CountUniqueChats(ctx)
-		deals, _ := repo.CountDeals(ctx)
-		conv := 0.0
-		if uniqueChats > 0 {
-			conv = float64(deals) / float64(uniqueChats) * 100
-		}
-		raspCount, _ := repo.CountCommandUsage(ctx, "/rasp")
-		addrCount, _ := repo.CountCommandUsage(ctx, "/address")
-		priceCount, _ := repo.CountCommandUsage(ctx, "/prices")
-
-		fmt.Fprintf(w, "Unique chats: %d\n", uniqueChats)
-		fmt.Fprintf(w, "Deals: %d\n", deals)
-		fmt.Fprintf(w, "Conversion: %.2f%%\n", conv)
-		fmt.Fprintf(w, "/rasp: %d\n", raspCount)
-		fmt.Fprintf(w, "/address: %d\n", addrCount)
-		fmt.Fprintf(w, "/prices: %d\n", priceCount)
-
-		msgCounts, _ := repo.MessageCountsBeforeDeal(ctx)
-		fmt.Fprintf(w, "Messages before deal:\n")
-		for _, m := range msgCounts {
-			fmt.Fprintf(w, "chat %d (%s): %d messages\n", m.ChatID, m.Username.String, m.Count)
-		}
-	})
+	http.HandleFunc("/stats", StatsHandler(repo))
 
 	log.Println("HTTP server listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
