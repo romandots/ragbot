@@ -70,6 +70,11 @@ func handleUserMessage(update tgbotapi.Update) {
 	userText := update.Message.Text
 	var answer string
 
+	// Обработка команды /start - инициализируем общение как если бы пользователь написал "Привет"
+	if userText == "/start" {
+		userText = "Привет"
+	}
+
 	defer func() {
 		conversation.AppendHistory(repo, chatID, "user", userText)
 		if answer != "" {
