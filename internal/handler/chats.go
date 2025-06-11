@@ -14,36 +14,41 @@ var chatsTemplate = template.Must(template.New("chats").Parse(`<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config={darkMode:'media'}</script>
     <title>Чаты</title>
 </head>
-<body class="bg-gray-100">
-<div class="max-w-4xl mx-auto p-4">
-    <table class="min-w-full bg-white rounded shadow">
-        <thead class="bg-gray-200">
+<body class="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+<div class="max-w-6xl mx-auto p-4 space-y-4">
+    <h1 class="text-2xl font-bold">Чаты</h1>
+    <div class="overflow-x-auto">
+    <table class="min-w-full bg-white dark:bg-gray-800 rounded shadow">
+        <thead class="bg-gray-200 dark:bg-gray-700">
         <tr>
-            <th class="px-2 py-1 text-left">Дата</th>
-            <th class="px-2 py-1 text-left">Чат</th>
-            <th class="px-2 py-1 text-left">Пользователь</th>
-            <th class="px-2 py-1 text-left">Лид</th>
-            <th class="px-2 py-1 text-left">Последнее сообщение</th>
+            <th class="px-4 py-2 text-left">Дата</th>
+            <th class="px-4 py-2 text-left">Чат</th>
+            <th class="px-4 py-2 text-left">Пользователь</th>
+            <th class="px-4 py-2 text-left">Лид</th>
+            <th class="px-4 py-2 text-left">Последнее сообщение</th>
         </tr>
         </thead>
         <tbody>
         {{range .Chats}}
-        <tr class="border-t">
-            <td class="px-2 py-1">{{.LastAt.Format "2006-01-02 15:04"}}</td>
-            <td class="px-2 py-1"><a class="text-blue-600" href="/chat/{{.ID}}">{{.Title.String}}</a></td>
-            <td class="px-2 py-1">{{.Name.String}} {{if .Username.Valid}}(@{{.Username.String}}){{end}}</td>
-            <td class="px-2 py-1">{{if .HasDeal}}✔{{else}}—{{end}}</td>
-            <td class="px-2 py-1">{{.LastMsg}}</td>
+        <tr class="border-t border-gray-200 dark:border-gray-700">
+            <td class="px-4 py-2 whitespace-nowrap">{{.LastAt.Format "2006-01-02 15:04"}}</td>
+            <td class="px-4 py-2 whitespace-nowrap"><a class="text-blue-600 dark:text-blue-400" href="/chat/{{.ID}}">{{.Title.String}}</a></td>
+            <td class="px-4 py-2 whitespace-nowrap">{{.Name.String}} {{if .Username.Valid}}(@{{.Username.String}}){{end}}</td>
+            <td class="px-4 py-2 whitespace-nowrap">{{if .HasDeal}}✔{{else}}—{{end}}</td>
+            <td class="px-4 py-2">{{.LastMsg}}</td>
         </tr>
         {{end}}
         </tbody>
     </table>
-    <div class="mt-4 flex justify-between">
-        {{if .HasPrev}}<a class="text-blue-600" href="?page={{.PrevPage}}">Предыдущая</a>{{else}}<span></span>{{end}}
-        {{if .HasNext}}<a class="text-blue-600" href="?page={{.NextPage}}">Следующая</a>{{end}}
+    </div>
+    <div class="flex justify-between">
+        {{if .HasPrev}}<a class="text-blue-600 dark:text-blue-400" href="?page={{.PrevPage}}">Предыдущая</a>{{else}}<span></span>{{end}}
+        {{if .HasNext}}<a class="text-blue-600 dark:text-blue-400" href="?page={{.NextPage}}">Следующая</a>{{end}}
     </div>
 </div>
 </body>
