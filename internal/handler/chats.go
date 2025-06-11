@@ -3,7 +3,6 @@ package handler
 import (
 	"html/template"
 	"net/http"
-	"os"
 	"strconv"
 
 	"ragbot/internal/repository"
@@ -27,8 +26,8 @@ var chatsTemplate = template.Must(template.New("chats").Parse(`<!DOCTYPE html>
         <thead class="bg-gray-200 dark:bg-gray-700">
         <tr>
             <th class="px-4 py-2 text-left">Дата</th>
-            <th class="px-4 py-2 text-left">Чат</th>
             <th class="px-4 py-2 text-left">Пользователь</th>
+            <th class="px-4 py-2 text-left">Чат</th>
             <th class="px-4 py-2 text-left">Лид</th>
             <th class="px-4 py-2 text-left">Последнее сообщение</th>
         </tr>
@@ -37,8 +36,19 @@ var chatsTemplate = template.Must(template.New("chats").Parse(`<!DOCTYPE html>
         {{range .Chats}}
         <tr class="border-t border-gray-200 dark:border-gray-700">
             <td class="px-4 py-2 whitespace-nowrap">{{.LastAt.Format "2006-01-02 15:04"}}</td>
+            <td class="px-4 py-2 whitespace-nowrap">
+			{{if .Name.Valid}}
+				{{.Name.String}}
+				{{if .Username.Valid}}
+					(@{{.Username.String}})
+				{{end}}
+			{{else}}
+				{{if .Username.Valid}}
+					@{{.Username.String}}
+				{{end}}
+			{{end}}
+			</td>
             <td class="px-4 py-2 whitespace-nowrap"><a class="text-blue-600 dark:text-blue-400" href="/chat/{{.ID}}">{{.Title.String}}</a></td>
-            <td class="px-4 py-2 whitespace-nowrap">{{.Name.String}} {{if .Username.Valid}}(@{{.Username.String}}){{end}}</td>
             <td class="px-4 py-2 whitespace-nowrap">{{if .HasDeal}}✔{{else}}—{{end}}</td>
             <td class="px-4 py-2">{{.LastMsg}}</td>
         </tr>
@@ -59,10 +69,7 @@ func ChatsHandler(repo *repository.Repository) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer util.Recover("ChatsHandler")
 
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != os.Getenv("STATS_USER") || pass != os.Getenv("STATS_PASS") {
-			w.Header().Set("WWW-Authenticate", "Basic realm=restricted")
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		if !authorize(w, r) {
 			return
 		}
 

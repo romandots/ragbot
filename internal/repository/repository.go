@@ -339,10 +339,11 @@ func (r *Repository) CountCommandUsage(ctx context.Context, cmd string) (int, er
 func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
 	ChatID   int64
 	Username sql.NullString
+	Name     sql.NullString
 	Count    int
 }, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT c.chat_id, c.username FROM conversations c JOIN conversation_history h ON c.chat_id=h.chat_id WHERE h.content=$1`, historyCallRequested)
+		`SELECT DISTINCT c.chat_id, c.username, c.name FROM conversations c JOIN conversation_history h ON c.chat_id=h.chat_id WHERE h.content=$1`, historyCallRequested)
 	if err != nil {
 		return nil, err
 	}
@@ -350,12 +351,14 @@ func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
 	var result []struct {
 		ChatID   int64
 		Username sql.NullString
+		Name     sql.NullString
 		Count    int
 	}
 	for rows.Next() {
 		var chatID int64
 		var username sql.NullString
-		if err := rows.Scan(&chatID, &username); err != nil {
+		var name sql.NullString
+		if err := rows.Scan(&chatID, &username, &name); err != nil {
 			return result, err
 		}
 		var count int
@@ -368,8 +371,9 @@ func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
 		result = append(result, struct {
 			ChatID   int64
 			Username sql.NullString
+			Name     sql.NullString
 			Count    int
-		}{chatID, username, count})
+		}{chatID, username, name, count})
 	}
 	return result, nil
 }

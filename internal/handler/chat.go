@@ -23,11 +23,14 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
 <div class="max-w-2xl mx-auto p-4 space-y-4">
     <h1 class="text-2xl font-bold">{{.Title}}</h1>
     {{if .Name}}
-    <div class="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded shadow">
+    <div class="p-4 rounded shadow">
         <h2 class="font-semibold mb-1">Контакт</h2>
         <p>{{.Name}}</p>
         {{if .Phone}}
         <p>{{.Phone}}</p>
+        {{end}}
+        {{if .Username}}
+        <p><a href="https://t.me/{{.Username}}">@{{.Username}}</a></p>
         {{end}}
     </div>
     {{end}}
@@ -39,14 +42,17 @@ var chatTemplate = template.Must(template.New("chat").Parse(`<!DOCTYPE html>
     {{end}}
     <div class="bg-white dark:bg-gray-800 p-4 rounded shadow space-y-2">
         {{range .History}}
-        <div>
-            {{if eq .Role "user"}}
-            <span class="font-semibold">{{$.Name}}:</span>
-            {{else}}
-            <span class="text-blue-600 dark:text-blue-400">Ассистент:</span>
-            {{end}}
-            <span>{{.Content}}</span>
-        </div>
+			{{if eq .Role "user"}}
+			<div class="bg-blue-100 dark:bg-blue-900/40 rounded p-3 mb-2">
+				<span class="font-semibold">@{{$.Username}}:</span>
+				<span>{{.Content}}</span>
+			</div>
+			{{else}}
+			<div class="bg-gray-100 dark:bg-gray-900/40 rounded p-3 mb-2">
+				<span class="text-blue-600 dark:text-blue-400">Ассистент:</span>
+				<span>{{.Content}}</span>
+			</div>
+			{{end}}
         {{end}}
     </div>
 </div>
@@ -64,17 +70,19 @@ func ChatHandler(repo *repository.Repository) http.HandlerFunc {
 		}
 		history := conversation.GetFullHistory(repo, info.ChatID)
 		data := struct {
-			Title   string
-			Summary string
-			Name    string
-			Phone   string
-			History []conversation.HistoryItem
+			Title    string
+			Summary  string
+			Name     string
+			Username string
+			Phone    string
+			History  []conversation.HistoryItem
 		}{
-			Title:   info.Title.String,
-			Summary: info.Summary.String,
-			Name:    info.Name.String,
-			Phone:   info.Phone.String,
-			History: history,
+			Title:    info.Title.String,
+			Summary:  info.Summary.String,
+			Name:     info.Name.String,
+			Username: info.Username.String,
+			Phone:    info.Phone.String,
+			History:  history,
 		}
 		chatTemplate.Execute(w, data)
 	}

@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"html/template"
 	"net/http"
-	"os"
-
 	"ragbot/internal/repository"
 	"ragbot/internal/util"
 )
@@ -33,16 +31,16 @@ var statsTemplate = template.Must(template.New("stats").Parse(`<!DOCTYPE html>
             <tr><td class="px-4 py-2">Уникальные чаты</td><td class="px-4 py-2">{{.UniqueChats}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Лиды</td><td class="px-4 py-2">{{.Deals}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия</td><td class="px-4 py-2">{{printf "%.2f" .Conversion}}%</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">/rasp</td><td class="px-4 py-2">{{.RaspCount}}</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">/address</td><td class="px-4 py-2">{{.AddrCount}}</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">/prices</td><td class="px-4 py-2">{{.PriceCount}}</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Расписание»</td><td class="px-4 py-2">{{.RaspCount}}</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Адреса»</td><td class="px-4 py-2">{{.AddrCount}}</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Цены»</td><td class="px-4 py-2">{{.PriceCount}}</td></tr>
         </tbody>
     </table>
     <table class="min-w-full bg-white dark:bg-gray-800 rounded shadow divide-y divide-gray-200 dark:divide-gray-700">
         <thead class="bg-gray-200 dark:bg-gray-700">
             <tr>
                 <th class="px-4 py-2 text-left">Chat ID</th>
-                <th class="px-4 py-2 text-left">Username</th>
+                <th class="px-4 py-2 text-left">Пользователь</th>
                 <th class="px-4 py-2 text-left">Сообщений до лида</th>
             </tr>
         </thead>
@@ -50,7 +48,18 @@ var statsTemplate = template.Must(template.New("stats").Parse(`<!DOCTYPE html>
             {{range .MsgCounts}}
             <tr class="border-t border-gray-200 dark:border-gray-700">
                 <td class="px-4 py-2">{{.ChatID}}</td>
-                <td class="px-4 py-2">{{.Username.String}}</td>
+				<td class="px-4 py-2">
+					{{if .Name.Valid}}
+						{{.Name.String}}
+						{{if .Username.Valid}}
+							(@{{.Username.String}})
+						{{end}}
+					{{else}}
+						{{if .Username.Valid}}
+							@{{.Username.String}}
+						{{end}}
+					{{end}}
+				</td>
                 <td class="px-4 py-2">{{.Count}}</td>
             </tr>
             {{end}}
@@ -64,14 +73,12 @@ func StatsHandler(repo *repository.Repository) http.HandlerFunc {
 	type msgCount struct {
 		ChatID   int64
 		Username sql.NullString
+		Name     sql.NullString
 		Count    int
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer util.Recover("StatsHandler")
-		user, pass, ok := r.BasicAuth()
-		if !ok || user != os.Getenv("STATS_USER") || pass != os.Getenv("STATS_PASS") {
-			w.Header().Set("WWW-Authenticate", "Basic realm=restricted")
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		if !authorize(w, r) {
 			return
 		}
 		ctx := r.Context()

@@ -1,10 +1,8 @@
 package handler
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-
 	"ragbot/internal/config"
 
 	"ragbot/internal/ai"
@@ -25,48 +23,22 @@ type QueryResponse struct {
 func StartHTTP(repo *repository.Repository, aiClient *ai.AIClient) {
 	defer util.Recover("StartHTTP")
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
-			return
-		}
-
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
-		ua := r.UserAgent()
-		ref := r.Referer()
-		q := r.URL.Query()
-		repo.AddVisit(r.Context(), ip, ua, ref,
-			q.Get("utm_source"), q.Get("utm_medium"), q.Get("utm_campaign"), q.Get("utm_content"), q.Get("utm_term"))
-
-		if config.Config.UserTelegramBotName != "" {
-			url := fmt.Sprintf(telegramWebUrlFormat, config.Config.UserTelegramBotName)
-			http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-		}
-
-		w.WriteHeader(http.StatusOK)
-	})
-
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-
-		if err := repo.Ping(ctx); err != nil {
-			log.Printf("Health check failed: %v", err)
-			w.WriteHeader(http.StatusServiceUnavailable)
-			w.Write([]byte("Database connection error: " + err.Error()))
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
+	http.HandleFunc("/", HandleEntry(repo))
+	http.HandleFunc("/health", HandleHealth(repo))
 	http.HandleFunc("/chat/", ChatHandler(repo))
 	http.HandleFunc("/chats", ChatsHandler(repo))
 	http.HandleFunc("/stats", StatsHandler(repo))
 
 	log.Println("HTTP server listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+func authorize(w http.ResponseWriter, r *http.Request) bool {
+	user, pass, ok := r.BasicAuth()
+	if !ok || user != config.Config.AdminUsername || pass != config.Config.AdminPassword {
+		w.Header().Set("WWW-Authenticate", "Basic realm=restricted")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return false
+	}
+	return true
 }

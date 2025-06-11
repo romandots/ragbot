@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"ragbot/internal/util"
 	"strconv"
 	"strings"
 )
@@ -21,6 +22,8 @@ type AppConfig struct {
 	YandexYMLURL        string
 	AmoDomain           string
 	AmoAccessToken      string
+	AdminUsername       string
+	AdminPassword       string
 }
 
 type AppSettings struct {
@@ -105,6 +108,8 @@ func LoadConfig() *AppConfig {
 		YandexYMLURL:        ymlURL,
 		AmoDomain:           amoDomain,
 		AmoAccessToken:      amoToken,
+		AdminUsername:       util.GetEnvString("ADMIN_USERNAME", "admin"),
+		AdminPassword:       util.GetEnvString("ADMIN_PASSWORD", "secret"),
 	}
 
 	return Config
