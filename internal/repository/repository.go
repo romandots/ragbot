@@ -181,6 +181,18 @@ type HistoryItem struct {
 	Content string
 }
 
+// ChatSummary holds information for listing chats.
+type ChatSummary struct {
+	ID       string
+	ChatID   int64
+	Username sql.NullString
+	Name     sql.NullString
+	Title    sql.NullString
+	HasDeal  bool
+	LastMsg  string
+	LastAt   time.Time
+}
+
 // AddVisit stores a visit to the landing page.
 func (r *Repository) AddVisit(ctx context.Context, ip, ua, referer, utmSource, utmMedium, utmCampaign, utmContent, utmTerm string) error {
 	_, err := r.db.ExecContext(ctx,
@@ -360,4 +372,34 @@ func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
 		}{chatID, username, count})
 	}
 	return result, nil
+}
+
+// ListChats returns chats sorted by last message time desc with pagination.
+func (r *Repository) ListChats(ctx context.Context, limit, offset int) ([]ChatSummary, error) {
+	rows, err := r.db.QueryContext(ctx, `
+               SELECT c.uuid, c.chat_id, c.username, c.name, c.title,
+                      EXISTS(SELECT 1 FROM conversation_history h2 WHERE h2.chat_id=c.chat_id AND h2.content=$1) AS has_deal,
+                      h.content, h.created_at
+               FROM conversations c
+               JOIN LATERAL (
+                       SELECT content, created_at FROM conversation_history h
+                       WHERE h.chat_id = c.chat_id
+                       ORDER BY id DESC LIMIT 1
+               ) h ON true
+               ORDER BY h.created_at DESC
+               LIMIT $2 OFFSET $3`, historyCallRequested, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ChatSummary
+	for rows.Next() {
+		var cs ChatSummary
+		if err := rows.Scan(&cs.ID, &cs.ChatID, &cs.Username, &cs.Name, &cs.Title, &cs.HasDeal, &cs.LastMsg, &cs.LastAt); err != nil {
+			return out, err
+		}
+		out = append(out, cs)
+	}
+	return out, nil
 }

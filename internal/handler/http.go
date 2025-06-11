@@ -65,6 +65,7 @@ func StartHTTP(repo *repository.Repository, aiClient *ai.AIClient) {
 	})
 
 	http.HandleFunc("/chat/", ChatHandler(repo))
+	http.HandleFunc("/chats", ChatsHandler(repo))
 
 	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
 		user, pass, ok := r.BasicAuth()
