@@ -91,7 +91,11 @@ func registerUserCommands() {
 
 func handleUserMessage(update tgbotapi.Update) {
 	chatID := update.Message.Chat.ID
-	conversation.EnsureSession(repo, chatID)
+	username := ""
+	if update.Message.From != nil {
+		username = update.Message.From.UserName
+	}
+	conversation.EnsureSession(repo, chatID, username)
 	userText := update.Message.Text
 	var answer string
 
@@ -273,7 +277,11 @@ func sendPrices(chatID int64) {
 
 func handleCallbackQuery(update tgbotapi.Update) {
 	chatID := update.CallbackQuery.Message.Chat.ID
-	conversation.EnsureSession(repo, chatID)
+	username := ""
+	if update.CallbackQuery.From != nil {
+		username = update.CallbackQuery.From.UserName
+	}
+	conversation.EnsureSession(repo, chatID, username)
 	data := update.CallbackQuery.Data
 	callback := tgbotapi.NewCallback(update.CallbackQuery.ID, "")
 	if _, err := userBot.Request(callback); err != nil {
