@@ -13,6 +13,8 @@ type Repository struct {
 	db *sql.DB
 }
 
+const historyCallRequested = "** хочет, чтобы ему перезвонили **"
+
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) Ping(ctx context.Context) error {
@@ -165,6 +167,7 @@ func (r *Repository) ListChunksWithoutExtID(ctx context.Context) ([]models.Chunk
 type ChatInfo struct {
 	ID           string
 	ChatID       int64
+	Username     sql.NullString
 	Title        sql.NullString
 	Summary      sql.NullString
 	Interest     sql.NullString
@@ -178,11 +181,36 @@ type HistoryItem struct {
 	Content string
 }
 
-func (r *Repository) EnsureSession(ctx context.Context, chatID int64) (string, error) {
+// ChatSummary holds information for listing chats.
+type ChatSummary struct {
+	ID       string
+	ChatID   int64
+	Username sql.NullString
+	Name     sql.NullString
+	Title    sql.NullString
+	HasDeal  bool
+	LastMsg  string
+	LastAt   time.Time
+}
+
+// AddVisit stores a visit to the landing page.
+func (r *Repository) AddVisit(ctx context.Context, ip, ua, referer, utmSource, utmMedium, utmCampaign, utmContent, utmTerm string) error {
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO visits(ip, user_agent, referer, utm_source, utm_medium, utm_campaign, utm_content, utm_term) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+		ip, ua, referer, utmSource, utmMedium, utmCampaign, utmContent, utmTerm,
+	)
+	return err
+}
+
+func (r *Repository) EnsureSession(ctx context.Context, chatID int64, username string) (string, error) {
 	var uuid string
 	err := r.db.QueryRowContext(ctx, `SELECT uuid FROM conversations WHERE chat_id=$1`, chatID).Scan(&uuid)
 	if err == sql.ErrNoRows {
-		err = r.db.QueryRowContext(ctx, `INSERT INTO conversations(chat_id) VALUES($1) RETURNING uuid`, chatID).Scan(&uuid)
+		err = r.db.QueryRowContext(ctx, `INSERT INTO conversations(chat_id, username) VALUES($1,$2) RETURNING uuid`, chatID, username).Scan(&uuid)
+	} else if err == nil {
+		if username != "" {
+			r.db.ExecContext(ctx, `UPDATE conversations SET username=$1 WHERE chat_id=$2`, username, chatID)
+		}
 	}
 	return uuid, err
 }
@@ -190,8 +218,8 @@ func (r *Repository) EnsureSession(ctx context.Context, chatID int64) (string, e
 func (r *Repository) GetChatInfoByChatID(ctx context.Context, chatID int64) (ChatInfo, error) {
 	var info ChatInfo
 	err := r.db.QueryRowContext(ctx,
-		`SELECT uuid, summary, title, interest, name, phone, amo_contact_id FROM conversations WHERE chat_id=$1`, chatID).
-		Scan(&info.ID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone, &info.AmoContactID)
+		`SELECT uuid, username, summary, title, interest, name, phone, amo_contact_id FROM conversations WHERE chat_id=$1`, chatID).
+		Scan(&info.ID, &info.Username, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone, &info.AmoContactID)
 	if err != nil {
 		return info, err
 	}
@@ -202,8 +230,8 @@ func (r *Repository) GetChatInfoByChatID(ctx context.Context, chatID int64) (Cha
 func (r *Repository) GetChatInfoByUUID(ctx context.Context, uuid string) (ChatInfo, error) {
 	var info ChatInfo
 	err := r.db.QueryRowContext(ctx,
-		`SELECT chat_id, summary, title, interest, name, phone, amo_contact_id FROM conversations WHERE uuid=$1`, uuid).
-		Scan(&info.ChatID, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone, &info.AmoContactID)
+		`SELECT chat_id, username, summary, title, interest, name, phone, amo_contact_id FROM conversations WHERE uuid=$1`, uuid).
+		Scan(&info.ChatID, &info.Username, &info.Summary, &info.Title, &info.Interest, &info.Name, &info.Phone, &info.AmoContactID)
 	if err != nil {
 		return info, err
 	}
@@ -281,4 +309,97 @@ func (r *Repository) GetFullHistory(ctx context.Context, chatID int64) ([]Histor
 		items = append(items, it)
 	}
 	return items, nil
+}
+
+// CountUniqueChats returns number of unique chat IDs in conversation history.
+func (r *Repository) CountUniqueChats(ctx context.Context) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(DISTINCT chat_id) FROM conversation_history`).Scan(&n)
+	return n, err
+}
+
+// CountDeals returns number of unique chats where a call to manager was requested.
+func (r *Repository) CountDeals(ctx context.Context) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT chat_id) FROM conversation_history WHERE content=$1`, historyCallRequested).Scan(&n)
+	return n, err
+}
+
+// CountCommandUsage returns number of times a command was issued.
+func (r *Repository) CountCommandUsage(ctx context.Context, cmd string) (int, error) {
+	var n int
+	like := cmd + `%`
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM conversation_history WHERE content LIKE $1`, like).Scan(&n)
+	return n, err
+}
+
+// MessageCountsBeforeDeal returns for each chat id that generated a lead the number of user messages before the request.
+func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
+	ChatID   int64
+	Username sql.NullString
+	Count    int
+}, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT c.chat_id, c.username FROM conversations c JOIN conversation_history h ON c.chat_id=h.chat_id WHERE h.content=$1`, historyCallRequested)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []struct {
+		ChatID   int64
+		Username sql.NullString
+		Count    int
+	}
+	for rows.Next() {
+		var chatID int64
+		var username sql.NullString
+		if err := rows.Scan(&chatID, &username); err != nil {
+			return result, err
+		}
+		var count int
+		err := r.db.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM conversation_history WHERE chat_id=$1 AND role='user' AND id <= (SELECT id FROM conversation_history WHERE chat_id=$1 AND content=$2 ORDER BY id ASC LIMIT 1)`,
+			chatID, historyCallRequested).Scan(&count)
+		if err != nil {
+			return result, err
+		}
+		result = append(result, struct {
+			ChatID   int64
+			Username sql.NullString
+			Count    int
+		}{chatID, username, count})
+	}
+	return result, nil
+}
+
+// ListChats returns chats sorted by last message time desc with pagination.
+func (r *Repository) ListChats(ctx context.Context, limit, offset int) ([]ChatSummary, error) {
+	rows, err := r.db.QueryContext(ctx, `
+               SELECT c.uuid, c.chat_id, c.username, c.name, c.title,
+                      EXISTS(SELECT 1 FROM conversation_history h2 WHERE h2.chat_id=c.chat_id AND h2.content=$1) AS has_deal,
+                      h.content, h.created_at
+               FROM conversations c
+               JOIN LATERAL (
+                       SELECT content, created_at FROM conversation_history h
+                       WHERE h.chat_id = c.chat_id
+                       ORDER BY id DESC LIMIT 1
+               ) h ON true
+               ORDER BY h.created_at DESC
+               LIMIT $2 OFFSET $3`, historyCallRequested, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []ChatSummary
+	for rows.Next() {
+		var cs ChatSummary
+		if err := rows.Scan(&cs.ID, &cs.ChatID, &cs.Username, &cs.Name, &cs.Title, &cs.HasDeal, &cs.LastMsg, &cs.LastAt); err != nil {
+			return out, err
+		}
+		out = append(out, cs)
+	}
+	return out, nil
 }

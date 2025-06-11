@@ -10,8 +10,8 @@ import (
 
 type ChatInfo = repository.ChatInfo
 
-func EnsureSession(repo *repository.Repository, chatID int64) (string, error) {
-	uuid, err := repo.EnsureSession(context.Background(), chatID)
+func EnsureSession(repo *repository.Repository, chatID int64, username string) (string, error) {
+	uuid, err := repo.EnsureSession(context.Background(), chatID, username)
 	if err != nil {
 		log.Printf("ensure session error: %v", err)
 		return "", err
