@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"ragbot/internal/config"
 	"ragbot/internal/repository"
 	"ragbot/internal/util"
 )
@@ -137,6 +138,14 @@ func handleAdminCommand(repo *repository.Repository, update tgbotapi.Update, cha
 			}
 			replyToAdminMarkdownV2(chatID, sb.String())
 			return true
+		case "stats":
+			url := fmt.Sprintf("%s/stats", config.Config.BaseURL)
+			replyToAdmin(chatID, url)
+			return true
+		case "chats":
+			url := fmt.Sprintf("%s/chats", config.Config.BaseURL)
+			replyToAdmin(chatID, url)
+			return true
 		}
 	}
 	return false
@@ -149,6 +158,8 @@ func registerAdminCommands() {
 		{Command: "update", Description: "Обновить фрагмент: /update <id> <текст>"},
 		{Command: "delete", Description: "Удалить фрагмент: /delete <id>"},
 		{Command: "list", Description: "Показать все фрагменты"},
+		{Command: "stats", Description: "Открыть статистику"},
+		{Command: "chats", Description: "Открыть список чатов"},
 	}
 
 	_, err := adminBot.Request(tgbotapi.NewSetMyCommands(commands...))

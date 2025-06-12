@@ -26,7 +26,9 @@ func HandleEntry(repo *repository.Repository) http.HandlerFunc {
 
 		if config.Config.UserTelegramBotName != "" {
 			url := fmt.Sprintf(telegramWebUrlFormat, config.Config.UserTelegramBotName)
-			http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			fmt.Fprintf(w, "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Redirect</title><script>window.location.replace('%s');</script></head><body><noscript><a href=\"%s\">Перейти в чат с ассистентом</a></noscript></body></html>", url, url)
+			return
 		}
 
 		w.WriteHeader(http.StatusOK)
