@@ -50,6 +50,7 @@
 | `CERTBOT_STAGING` | Добавить `--staging` для тестовых сертификатов (опционально) |
 | `STATS_USER` | Логин для доступа к странице статистики |
 | `STATS_PASS` | Пароль для доступа к странице статистики |
+| `TELEGRAM_CHANNEL` | Адрес Telegram-канала (без @) |
 
 ## Установка
 
@@ -71,6 +72,7 @@ POSTGRES_PASSWORD=your_secure_password_here
 USER_TELEGRAM_TOKEN=your_user_telegram_token
 ADMIN_TELEGRAM_TOKEN=your_admin_telegram_token
 ADMIN_CHAT_IDS=123456789,987654321
+TELEGRAM_CHANNEL=your_channel_name
 
 # Переменные для продакшн-развертывания
 DOMAIN_NAME=yourdomain.com

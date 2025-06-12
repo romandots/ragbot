@@ -62,6 +62,7 @@ const (
 	msgStatsButton            = "Статистика"
 	msgChatsPrompt            = "Чтобы открыть список чатов, нажмите кнопку:"
 	msgChatsButton            = "Чаты"
+	msgChannelPrompt          = "Чтобы открыть телеграм-канал ШТБП, нажмите кнопку:"
 )
 
 const (

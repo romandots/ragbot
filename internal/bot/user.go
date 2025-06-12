@@ -81,6 +81,7 @@ func registerUserCommands() {
 		{Command: "prices", Description: "Показать цены на обучение"},
 		{Command: "rasp", Description: "Показать расписание занятий"},
 		{Command: "call", Description: "Заказать обратный звонок от менеджера"},
+		{Command: "channel", Description: "Перейти в телеграм-канал ШТБП"},
 	}
 
 	_, err := userBot.Request(tgbotapi.NewSetMyCommands(commands...))
@@ -180,6 +181,9 @@ func handleUserCommand(update tgbotapi.Update, chatID int64) bool {
 			return true
 		case "call":
 			userBot.Send(callMeBackButton(chatID))
+			return true
+		case "channel":
+			userBot.Send(channelButton(chatID, config.Config.TelegramChannel))
 			return true
 		default:
 		}

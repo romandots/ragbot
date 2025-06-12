@@ -24,6 +24,7 @@ type AppConfig struct {
 	AmoAccessToken      string
 	AdminUsername       string
 	AdminPassword       string
+	TelegramChannel     string
 }
 
 type AppSettings struct {
@@ -76,6 +77,7 @@ func LoadConfig() *AppConfig {
 	ymlURL := os.Getenv("YANDEX_YML_URL")
 	amoDomain := os.Getenv("AMO_DOMAIN")
 	amoToken := os.Getenv("AMO_ACCESS_TOKEN")
+	telegramChannel := os.Getenv("TELEGRAM_CHANNEL")
 	useExternal := false
 	if os.Getenv("USE_EXTERNAL_SOURCE") == "true" {
 		useExternal = true
@@ -108,6 +110,7 @@ func LoadConfig() *AppConfig {
 		YandexYMLURL:        ymlURL,
 		AmoDomain:           amoDomain,
 		AmoAccessToken:      amoToken,
+		TelegramChannel:     telegramChannel,
 		AdminUsername:       util.GetEnvString("ADMIN_USERNAME", "admin"),
 		AdminPassword:       util.GetEnvString("ADMIN_PASSWORD", "secret"),
 	}
