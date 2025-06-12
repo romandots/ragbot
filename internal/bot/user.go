@@ -217,15 +217,7 @@ func sendSchedule(chatID int64) {
 		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
-	var rows [][]tgbotapi.InlineKeyboardButton
-	for _, b := range branches {
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL(fmt.Sprintf(msgScheduleLinkFormat, b.Title), b.ScheduleLink),
-		))
-	}
-	msg := tgbotapi.NewMessage(chatID, msgScheduleTitle)
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
-	userBot.Send(msg)
+	userBot.Send(scheduleButtons(chatID, branches))
 }
 
 func sendPrices(chatID int64) {
@@ -239,39 +231,10 @@ func sendPrices(chatID int64) {
 		replyToUser(chatID, msgInfoUnavailable)
 		return
 	}
-	var rows [][]tgbotapi.InlineKeyboardButton
 	priceMu.Lock()
-	priceMap = make(map[string]string)
-	for i, p := range prices {
-		key := fmt.Sprintf("PRICE_%d", i)
-		properties := ""
-		if p.Hours != "" {
-			properties = properties + fmt.Sprintf(msgPassHoursFormat, p.Hours)
-		}
-		if p.GuestVisits != "" {
-			properties = properties + fmt.Sprintf(msgGuestVisitsFormat, p.GuestVisits)
-		}
-		if p.FreezeAllowed != "" {
-			properties = properties + msgPassFreezeAllowed
-		}
-		if p.Lifetime != "" {
-			properties = properties + fmt.Sprintf(msgPassLifetimeFormat, p.Lifetime)
-		}
-		properties = tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, properties)
-		if p.Price != "" {
-			properties = properties + fmt.Sprintf(msgPriceFormat, p.Price)
-		}
-		name := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, p.Name)
-		description := tgbotapi.EscapeText(tgbotapi.ModeMarkdownV2, p.Description)
-		priceMap[key] = fmt.Sprintf(msgPriceDescriptionFormat, name, description, properties)
-		label := fmt.Sprintf(msgPriceButtonFormat, p.Name, p.Price)
-		rows = append(rows, tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(label, key),
-		))
-	}
+	msg, m := priceButtons(chatID, prices)
+	priceMap = m
 	priceMu.Unlock()
-	msg := tgbotapi.NewMessage(chatID, msgPricesTitle)
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
 	userBot.Send(msg)
 }
 

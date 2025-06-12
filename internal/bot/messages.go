@@ -58,6 +58,10 @@ const (
 	msgPassLifetimeFormat     = "• Срок действия: %s дн.\n"
 	msgPriceFormat            = "• *Стоимость: %s₽*\n"
 	msgScheduleLinkFormat     = "Расписание студии %s"
+	msgStatsPrompt            = "Чтобы открыть статистику, нажмите кнопку:"
+	msgStatsButton            = "Статистика"
+	msgChatsPrompt            = "Чтобы открыть список чатов, нажмите кнопку:"
+	msgChatsButton            = "Чаты"
 )
 
 const (

@@ -140,11 +140,11 @@ func handleAdminCommand(repo *repository.Repository, update tgbotapi.Update, cha
 			return true
 		case "stats":
 			url := fmt.Sprintf("%s/stats", config.Config.BaseURL)
-			replyToAdmin(chatID, url)
+			adminBot.Send(statsButton(chatID, url))
 			return true
 		case "chats":
 			url := fmt.Sprintf("%s/chats", config.Config.BaseURL)
-			replyToAdmin(chatID, url)
+			adminBot.Send(chatsButton(chatID, url))
 			return true
 		}
 	}
