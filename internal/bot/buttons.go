@@ -52,6 +52,18 @@ func chatsButton(chatID int64, url string) tgbotapi.MessageConfig {
 	return msg
 }
 
+func channelButton(chatID int64, channel string) tgbotapi.MessageConfig {
+	url := fmt.Sprintf("https://t.me/%s", channel)
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("@"+channel, url),
+		),
+	)
+	msg := tgbotapi.NewMessage(chatID, msgChannelPrompt)
+	msg.ReplyMarkup = keyboard
+	return msg
+}
+
 func scheduleButtons(chatID int64, branches []tansultant.Branch) tgbotapi.MessageConfig {
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, b := range branches {
