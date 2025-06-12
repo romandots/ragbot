@@ -29,12 +29,12 @@ var statsTemplate = template.Must(template.New("stats").Parse(`<!DOCTYPE html>
         </thead>
         <tbody>
             <tr><td class="px-4 py-2">Переходы в бота</td><td class="px-4 py-2">{{.Visits}}</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Начато бесед</td><td class="px-4 py-2">{{.UniqueChats}}</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия заходов в беседы</td><td class="px-4 py-2">{{printf "%.2f" .VisitToChatConversion}}%</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Диалоги с ботом</td><td class="px-4 py-2">{{.UniqueChats}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Лиды</td><td class="px-4 py-2">{{.Deals}}</td></tr>
+            <tr class="border-t-2 border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия заходов в беседы</td><td class="px-4 py-2">{{printf "%.2f" .VisitToChatConversion}}%</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия бесед в лиды</td><td class="px-4 py-2">{{printf "%.2f" .ChatToLeadConversion}}%</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия переходов в лиды</td><td class="px-4 py-2">{{printf "%.2f" .VisitToLeadConversion}}%</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Расписание»</td><td class="px-4 py-2">{{.RaspCount}}</td></tr>
+            <tr class="border-t-2 border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Расписание»</td><td class="px-4 py-2">{{.RaspCount}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Адреса»</td><td class="px-4 py-2">{{.AddrCount}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Цены»</td><td class="px-4 py-2">{{.PriceCount}}</td></tr>
         </tbody>
