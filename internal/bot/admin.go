@@ -45,9 +45,7 @@ func handleAdminUpdates(repo *repository.Repository, allowedIDs []int64) {
 		if update.Message == nil {
 			continue
 		}
-		if handleAdminMessage(repo, update, allowed) {
-			return
-		}
+		handleAdminMessage(repo, update, allowed)
 	}
 }
 
