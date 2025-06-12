@@ -15,6 +15,11 @@ type Repository struct {
 
 const historyCallRequested = "** хочет, чтобы ему перезвонили **"
 
+// botUserAgentRegex is a case-insensitive regular expression that matches
+// common bot user agents. It is used to filter out automated visits when
+// calculating statistics.
+const botUserAgentRegex = "(bot|crawl|spider|slurp|yandex|bing|baidu|duckduckgo|crawler|telegrambot|geo|advert|http\\-client|python|expanse|modat|odin)"
+
 func New(db *sql.DB) *Repository { return &Repository{db: db} }
 
 func (r *Repository) Ping(ctx context.Context) error {
@@ -330,7 +335,10 @@ func (r *Repository) CountDeals(ctx context.Context) (int, error) {
 func (r *Repository) CountUniqueVisits(ctx context.Context) (int, error) {
 	var n int
 	err := r.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM (SELECT DISTINCT ip, user_agent FROM visits) AS v`).Scan(&n)
+		`SELECT COUNT(*) FROM (
+                        SELECT DISTINCT ip, user_agent FROM visits
+                        WHERE user_agent !~* $1 AND user_agent IS NOT NULL AND user_agent != ''
+                ) AS v`, botUserAgentRegex).Scan(&n)
 	return n, err
 }
 
