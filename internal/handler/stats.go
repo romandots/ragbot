@@ -28,9 +28,12 @@ var statsTemplate = template.Must(template.New("stats").Parse(`<!DOCTYPE html>
             </tr>
         </thead>
         <tbody>
-            <tr><td class="px-4 py-2">Уникальные чаты</td><td class="px-4 py-2">{{.UniqueChats}}</td></tr>
+            <tr><td class="px-4 py-2">Переходы в бота</td><td class="px-4 py-2">{{.Visits}}</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Начато бесед</td><td class="px-4 py-2">{{.UniqueChats}}</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия заходов в беседы</td><td class="px-4 py-2">{{printf "%.2f" .VisitToChatConversion}}%</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Лиды</td><td class="px-4 py-2">{{.Deals}}</td></tr>
-            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия</td><td class="px-4 py-2">{{printf "%.2f" .Conversion}}%</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия бесед в лиды</td><td class="px-4 py-2">{{printf "%.2f" .ChatToLeadConversion}}%</td></tr>
+            <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Конверсия переходов в лиды</td><td class="px-4 py-2">{{printf "%.2f" .VisitToLeadConversion}}%</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Расписание»</td><td class="px-4 py-2">{{.RaspCount}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Адреса»</td><td class="px-4 py-2">{{.AddrCount}}</td></tr>
             <tr class="border-t border-gray-200 dark:border-gray-700"><td class="px-4 py-2">Нажатий кнопки «Цены»</td><td class="px-4 py-2">{{.PriceCount}}</td></tr>
@@ -47,7 +50,7 @@ var statsTemplate = template.Must(template.New("stats").Parse(`<!DOCTYPE html>
         <tbody>
             {{range .MsgCounts}}
             <tr class="border-t border-gray-200 dark:border-gray-700">
-                <td class="px-4 py-2">{{.ChatID}}</td>
+                <td class="px-4 py-2"><a class="text-blue-600 dark:text-blue-400" href="/chat/{{.ID}}">{{.ChatID}}</a></td>
 				<td class="px-4 py-2">
 					{{if .Name.Valid}}
 						{{.Name.String}}
@@ -71,6 +74,7 @@ var statsTemplate = template.Must(template.New("stats").Parse(`<!DOCTYPE html>
 
 func StatsHandler(repo *repository.Repository) http.HandlerFunc {
 	type msgCount struct {
+		ID       string
 		ChatID   int64
 		Username sql.NullString
 		Name     sql.NullString
@@ -82,11 +86,18 @@ func StatsHandler(repo *repository.Repository) http.HandlerFunc {
 			return
 		}
 		ctx := r.Context()
+		visits, _ := repo.CountUniqueVisits(ctx)
 		uniqueChats, _ := repo.CountUniqueChats(ctx)
 		deals, _ := repo.CountDeals(ctx)
-		conv := 0.0
+		chatToLeadConv := 0.0
+		visitToChatConv := 0.0
+		visitToLeadConv := 0.0
 		if uniqueChats > 0 {
-			conv = float64(deals) / float64(uniqueChats) * 100
+			chatToLeadConv = float64(deals) / float64(uniqueChats) * 100
+		}
+		if visits > 0 {
+			visitToChatConv = float64(uniqueChats) / float64(visits) * 100
+			visitToLeadConv = float64(deals) / float64(visits) * 100
 		}
 		raspCount, _ := repo.CountCommandUsage(ctx, "/rasp")
 		addrCount, _ := repo.CountCommandUsage(ctx, "/address")
@@ -97,21 +108,27 @@ func StatsHandler(repo *repository.Repository) http.HandlerFunc {
 			msgCounts = append(msgCounts, msgCount(m))
 		}
 		data := struct {
-			UniqueChats int
-			Deals       int
-			Conversion  float64
-			RaspCount   int
-			AddrCount   int
-			PriceCount  int
-			MsgCounts   []msgCount
+			Visits                int
+			UniqueChats           int
+			VisitToChatConversion float64
+			Deals                 int
+			ChatToLeadConversion  float64
+			VisitToLeadConversion float64
+			RaspCount             int
+			AddrCount             int
+			PriceCount            int
+			MsgCounts             []msgCount
 		}{
-			UniqueChats: uniqueChats,
-			Deals:       deals,
-			Conversion:  conv,
-			RaspCount:   raspCount,
-			AddrCount:   addrCount,
-			PriceCount:  priceCount,
-			MsgCounts:   msgCounts,
+			Visits:                visits,
+			UniqueChats:           uniqueChats,
+			VisitToChatConversion: visitToChatConv,
+			Deals:                 deals,
+			ChatToLeadConversion:  chatToLeadConv,
+			VisitToLeadConversion: visitToLeadConv,
+			RaspCount:             raspCount,
+			AddrCount:             addrCount,
+			PriceCount:            priceCount,
+			MsgCounts:             msgCounts,
 		}
 		statsTemplate.Execute(w, data)
 	}

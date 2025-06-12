@@ -326,6 +326,14 @@ func (r *Repository) CountDeals(ctx context.Context) (int, error) {
 	return n, err
 }
 
+// CountUniqueVisits returns number of unique visits based on IP and user agent.
+func (r *Repository) CountUniqueVisits(ctx context.Context) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM (SELECT DISTINCT ip, user_agent FROM visits) AS v`).Scan(&n)
+	return n, err
+}
+
 // CountCommandUsage returns number of times a command was issued.
 func (r *Repository) CountCommandUsage(ctx context.Context, cmd string) (int, error) {
 	var n int
@@ -337,28 +345,31 @@ func (r *Repository) CountCommandUsage(ctx context.Context, cmd string) (int, er
 
 // MessageCountsBeforeDeal returns for each chat id that generated a lead the number of user messages before the request.
 func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
+	ID       string
 	ChatID   int64
 	Username sql.NullString
 	Name     sql.NullString
 	Count    int
 }, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT DISTINCT c.chat_id, c.username, c.name FROM conversations c JOIN conversation_history h ON c.chat_id=h.chat_id WHERE h.content=$1`, historyCallRequested)
+		`SELECT DISTINCT c.uuid, c.chat_id, c.username, c.name FROM conversations c JOIN conversation_history h ON c.chat_id=h.chat_id WHERE h.content=$1`, historyCallRequested)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var result []struct {
+		ID       string
 		ChatID   int64
 		Username sql.NullString
 		Name     sql.NullString
 		Count    int
 	}
 	for rows.Next() {
+		var id string
 		var chatID int64
 		var username sql.NullString
 		var name sql.NullString
-		if err := rows.Scan(&chatID, &username, &name); err != nil {
+		if err := rows.Scan(&id, &chatID, &username, &name); err != nil {
 			return result, err
 		}
 		var count int
@@ -369,11 +380,12 @@ func (r *Repository) MessageCountsBeforeDeal(ctx context.Context) ([]struct {
 			return result, err
 		}
 		result = append(result, struct {
+			ID       string
 			ChatID   int64
 			Username sql.NullString
 			Name     sql.NullString
 			Count    int
-		}{chatID, username, name, count})
+		}{id, chatID, username, name, count})
 	}
 	return result, nil
 }
