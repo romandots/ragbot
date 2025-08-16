@@ -244,6 +244,7 @@ func sendPrices(chatID int64) {
 
 func handleCallbackQuery(update tgbotapi.Update) {
 	chatID := update.CallbackQuery.Message.Chat.ID
+	messageID := update.CallbackQuery.Message.MessageID
 	username := ""
 	if update.CallbackQuery.From != nil {
 		username = update.CallbackQuery.From.UserName
@@ -259,9 +260,13 @@ func handleCallbackQuery(update tgbotapi.Update) {
 	switch data {
 	case actionCallManager:
 		callManagerAction(chatID)
+		// Удаляем сообщение с кнопкой после нажатия
+		deleteMessage(chatID, messageID)
 	case actionConfirmYes:
 		conversation.AppendHistory(repo, chatID, "user", historyConfirmYes)
 		finalizeContactRequest(chatID)
+		// Удаляем сообщение с кнопкой после нажатия
+		deleteMessage(chatID, messageID)
 	case actionConfirmNo:
 		conversation.AppendHistory(repo, chatID, "user", historyConfirmNo)
 		conversation.ClearAmoContactID(repo, chatID)
@@ -269,6 +274,8 @@ func handleCallbackQuery(update tgbotapi.Update) {
 		contactSteps[chatID] = &contactState{Stage: 1}
 		stateMu.Unlock()
 		replyToUser(chatID, msgAskName)
+		// Удаляем сообщение с кнопкой после нажатия
+		deleteMessage(chatID, messageID)
 	default:
 		if strings.HasPrefix(data, "PRICE_") {
 			priceMu.RLock()
@@ -276,6 +283,8 @@ func handleCallbackQuery(update tgbotapi.Update) {
 			priceMu.RUnlock()
 			if desc != "" {
 				replyToUserMarkdownV2(chatID, desc)
+				// Удаляем сообщение с кнопкой после нажатия
+				deleteMessage(chatID, messageID)
 			} else {
 				log.Printf("Unknown price callback: %s", data)
 			}
@@ -299,5 +308,14 @@ func replyToUserMarkdownV2(chatID int64, message string) {
 	_, err := userBot.Send(msg)
 	if err != nil {
 		log.Printf("Error sending message: %s", err.Error())
+	}
+}
+
+// deleteMessage удаляет сообщение по chatID и messageID
+func deleteMessage(chatID int64, messageID int) {
+	deleteMsg := tgbotapi.NewDeleteMessage(chatID, messageID)
+	_, err := userBot.Request(deleteMsg)
+	if err != nil {
+		log.Printf("Error deleting message: %s", err.Error())
 	}
 }
