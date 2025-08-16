@@ -7,7 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/pgvector/pgvector-go v0.3.0
 	github.com/pressly/goose/v3 v3.24.3
-	github.com/sashabaranov/go-openai v1.40.1
+	github.com/sashabaranov/go-openai v1.41.1
 )
 
 require (

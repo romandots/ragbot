@@ -51,9 +51,10 @@ var defaultClient = DefaultAmoClient()
 
 // Lead represents an amoCRM lead structure
 type lead struct {
-	Name               string `json:"name,omitempty"`
-	Embedded           embed  `json:"_embedded,omitempty"`
-	CustomFieldsValues []cf   `json:"custom_fields_values,omitempty"`
+	Name               string   `json:"name,omitempty"`
+	Embedded           embed    `json:"_embedded,omitempty"`
+	CustomFieldsValues []cf     `json:"custom_fields_values,omitempty"`
+	Tags               []string `json:"tags,omitempty"`
 }
 
 // Value represents a value in custom fields
@@ -133,6 +134,9 @@ func (c *AmoClient) SendLeadToAMO(repo *repository.Repository, info *conversatio
 		}
 	}
 
+	// Generate dynamic tags based on conversation content
+	dynamicTags := c.generateDynamicTags(info)
+
 	var cont *savedContact
 	var err error
 	if info.AmoContactID.Valid {
@@ -147,7 +151,7 @@ func (c *AmoClient) SendLeadToAMO(repo *repository.Repository, info *conversatio
 	}
 
 	// Create lead
-	_, err = c.createLead(ctx, cont, info.Title.String, info.Summary.String, info.Interest.String, link, branches)
+	_, err = c.createLead(ctx, cont, info.Title.String, info.Summary.String, info.Interest.String, link, branches, dynamicTags)
 	if err != nil {
 		errMsg := fmt.Sprintf("Failed to create a lead: %s", err)
 		return errors.New(errMsg)
@@ -182,8 +186,8 @@ func (c *AmoClient) createContact(ctx context.Context, name, phone string) (*sav
 	return &contactResp.Embedded.Contacts[0], nil
 }
 
-func (c *AmoClient) createLead(ctx context.Context, cont *savedContact, leadName, summary, interest, link string, branches []string) (*http.Response, error) {
-	lead := buildLead(leadName, cont, summary, interest, link, branches)
+func (c *AmoClient) createLead(ctx context.Context, cont *savedContact, leadName, summary, interest, link string, branches []string, dynamicTags []string) (*http.Response, error) {
+	lead := buildLead(leadName, cont, summary, interest, link, branches, dynamicTags)
 	url := fmt.Sprintf(leadsComplexEndpoint, config.Config.AmoDomain)
 
 	return c.makeJSONRequest(ctx, url, []any{lead})
@@ -217,6 +221,45 @@ func (c *AmoClient) makeJSONRequest(ctx context.Context, url string, payload any
 	return resp, nil
 }
 
+// generateDynamicTags создает теги на основе содержимого разговора
+func (c *AmoClient) generateDynamicTags(info *conversation.ChatInfo) []string {
+	tags := make([]string, 0)
+
+	// Check if dynamic tags are enabled
+	if !amoConfig.dynamicTagsEnabled {
+		return tags
+	}
+
+	// Add tags based on interest
+	if info.Interest.Valid && info.Interest.String != "" {
+		tags = append(tags, "Интерес: "+info.Interest.String)
+	}
+
+	// Add tags based on summary content
+	if info.Summary.Valid && info.Summary.String != "" {
+		summary := strings.ToLower(info.Summary.String)
+		
+		// Add tags based on configured keywords
+		for keyword, keywordTags := range amoConfig.keywordTagsMap {
+			if strings.Contains(summary, keyword) {
+				tags = append(tags, keywordTags...)
+			}
+		}
+	}
+
+	// Add tag based on whether contact already exists
+	if info.AmoContactID.Valid {
+		tags = append(tags, "Повторный клиент")
+	} else {
+		tags = append(tags, "Новый клиент")
+	}
+
+	// Add tag for RAG bot
+	tags = append(tags, "RAG Бот")
+
+	return tags
+}
+
 func buildContact(name, phone string) *contact {
 	return &contact{
 		Name: name,
@@ -229,7 +272,12 @@ func buildContact(name, phone string) *contact {
 	}
 }
 
-func buildLead(leadName string, cont *savedContact, summary, interest, link string, branches []string) *lead {
+func buildLead(leadName string, cont *savedContact, summary, interest, link string, branches []string, dynamicTags []string) *lead {
+	// Combine static and dynamic tags
+	allTags := make([]string, 0, len(amoConfig.tags)+len(dynamicTags))
+	allTags = append(allTags, amoConfig.tags...)
+	allTags = append(allTags, dynamicTags...)
+
 	l := &lead{
 		Name: leadName,
 		Embedded: embed{
@@ -239,6 +287,7 @@ func buildLead(leadName string, cont *savedContact, summary, interest, link stri
 				},
 			},
 		},
+		Tags: allTags,
 	}
 
 	customFields := []cf{}

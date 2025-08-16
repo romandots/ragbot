@@ -45,6 +45,9 @@
 | `YANDEX_YML_URL` | URL к файлу Yandex YML |
 | `AMO_DOMAIN` | Домен amoCRM (например, `example.amocrm.ru`) |
 | `AMO_ACCESS_TOKEN` | OAuth токен доступа для API amoCRM |
+| `AMO_LEAD_TAGS` | Статические теги для лидов (через запятую) |
+| `AMO_DYNAMIC_TAGS_ENABLED` | Включить/выключить динамические теги (`true`/`false`) |
+| `AMO_KEYWORD_TAGS_MAP` | JSON-карта ключевых слов и тегов |
 | `PREAMBLE` | Преамбула для взаимодействия с моделью |
 | `CALL_MANAGER_TRIGGER_WORDS` | Слова-триггеры для вызова менеджера (через запятую) |
 | `CERTBOT_STAGING` | Добавить `--staging` для тестовых сертификатов (опционально) |
@@ -83,6 +86,13 @@ USE_LOCAL_MODEL=true
 OPENAI_API_KEY=your_openai_api_key
 EDUCATION_FILE_PATH=education.txt
 USE_EXTERNAL_SOURCE=false
+
+# Amo CRM Configuration
+AMO_DOMAIN=your-domain.amocrm.ru
+AMO_ACCESS_TOKEN=your-access-token
+AMO_LEAD_TAGS=RAG Бот,Автоматический лид
+AMO_DYNAMIC_TAGS_ENABLED=true
+AMO_KEYWORD_TAGS_MAP='{"консультация": ["Консультация"], "цена": ["Цена"]}'
 
 # Для тестирования с staging сертификатами (раскомментируйте при необходимости)
 # CERTBOT_STAGING=--staging
@@ -233,3 +243,42 @@ docker-compose exec nginx nginx -t
 ```bash
 docker-compose exec nginx nginx -s reload
 ```
+
+## Интеграция с Amo CRM
+
+### Настройка тегов для лидов
+
+Система поддерживает автоматическое добавление тегов к создаваемым лидам в Amo CRM. Теги могут быть статическими (настраиваются через переменные окружения) и динамическими (генерируются на основе содержимого разговора).
+
+#### Статические теги
+
+Добавляются ко всем создаваемым лидам:
+
+```env
+AMO_LEAD_TAGS=RAG Бот,Автоматический лид,Маркетинг
+```
+
+#### Динамические теги
+
+Генерируются на основе содержимого разговора:
+
+```env
+# Включить/выключить динамические теги
+AMO_DYNAMIC_TAGS_ENABLED=true
+
+# Настройка ключевых слов и тегов
+AMO_KEYWORD_TAGS_MAP='{
+  "консультация": ["Консультация", "Услуга"],
+  "цена": ["Цена", "Коммерческий"],
+  "маркетинг": ["Маркетинг", "Реклама"]
+}'
+```
+
+#### Автоматически добавляемые теги
+
+- **RAG Бот** - добавляется ко всем лидам
+- **Новый клиент** / **Повторный клиент** - определяется автоматически
+- **Интерес: [значение]** - на основе интереса клиента
+- Теги на основе ключевых слов в разговоре
+
+Подробная документация по настройке тегов доступна в файле [AMO_TAGS_CONFIG.md](AMO_TAGS_CONFIG.md).

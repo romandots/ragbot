@@ -124,3 +124,69 @@ func TestSendLeadCreatesContact(t *testing.T) {
 		t.Fatalf("contact id not saved correctly: %+v %d", lastContact, lastChatID)
 	}
 }
+
+func TestSendLeadWithTags(t *testing.T) {
+	repo := newTestRepo(t)
+	client := &AmoClient{HTTPClient: &fakeHTTPClient{}}
+	config.Config = &config.AppConfig{AmoDomain: "example.com", AmoAccessToken: "token"}
+	
+	// Load config with tags
+	loadConfig()
+	
+	info := conversation.ChatInfo{
+		ChatID:  3,
+		Name:    sql.NullString{String: "Test User", Valid: true},
+		Phone:   sql.NullString{String: "1234567890", Valid: true},
+		Title:   sql.NullString{String: "Test Lead", Valid: true},
+		Summary: sql.NullString{String: "Клиент интересуется консультацией по услугам", Valid: true},
+		Interest: sql.NullString{String: "Услуги", Valid: true},
+	}
+	
+	fhc := client.HTTPClient.(*fakeHTTPClient)
+	if err := client.SendLeadToAMO(repo, &info, "https://example.com/chat"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	
+	// Should create contact and lead
+	if len(fhc.requests) != 2 {
+		t.Fatalf("expected 2 requests, got %d", len(fhc.requests))
+	}
+	
+	// Check that lead request contains tags
+	leadRequest := fhc.requests[1] // Second request should be for lead
+	if !strings.Contains(leadRequest.URL.Path, "/leads/complex") {
+		t.Fatalf("expected lead request, got: %s", leadRequest.URL.Path)
+	}
+	
+	// Read request body to check for tags
+	body, err := io.ReadAll(leadRequest.Body)
+	if err != nil {
+		t.Fatalf("failed to read request body: %v", err)
+	}
+	
+	// Check that body contains tags field
+	if !strings.Contains(string(body), `"tags"`) {
+		t.Fatalf("request body should contain tags field: %s", string(body))
+	}
+	
+	// Check for specific tags
+	if !strings.Contains(string(body), `"RAG Бот"`) {
+		t.Fatalf("request body should contain RAG Бот tag: %s", string(body))
+	}
+	
+	if !strings.Contains(string(body), `"Новый клиент"`) {
+		t.Fatalf("request body should contain Новый клиент tag: %s", string(body))
+	}
+	
+	if !strings.Contains(string(body), `"Консультация"`) {
+		t.Fatalf("request body should contain Консультация tag: %s", string(body))
+	}
+	
+	if !strings.Contains(string(body), `"Услуга"`) {
+		t.Fatalf("request body should contain Услуга tag: %s", string(body))
+	}
+	
+	if !strings.Contains(string(body), `"Интерес: Услуги"`) {
+		t.Fatalf("request body should contain interest tag: %s", string(body))
+	}
+}

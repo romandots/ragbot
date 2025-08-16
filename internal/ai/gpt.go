@@ -29,7 +29,7 @@ func (g *GPTStrategy) GenerateEmbedding(text string) ([]float32, error) {
 
 func (g *GPTStrategy) GenerateResponse(prompt string) (string, error) {
 	chatReq := go_openai.ChatCompletionRequest{
-		Model:       go_openai.GPT4Turbo, //go_openai.GPT3Dot5Turbo,
+		Model:       go_openai.GPT4oMini, //go_openai.GPT3Dot5Turbo,
 		Messages:    []go_openai.ChatCompletionMessage{{Role: "system", Content: prompt}},
 		MaxTokens:   512,
 		Temperature: 0.2,
