@@ -35,7 +35,7 @@ var chatsTemplate = template.Must(template.New("chats").Parse(`<!DOCTYPE html>
         <tbody>
         {{range .Chats}}
         <tr class="border-t border-gray-200 dark:border-gray-700">
-            <td class="px-4 py-2 whitespace-nowrap">{{.LastAt.Format "2006-01-02 15:04"}}</td>
+            <td class="px-4 py-2 whitespace-nowrap"><a class="text-blue-600 dark:text-blue-400" href="/chat/{{.ID}}">{{.LastAt.Format "2006-01-02 15:04"}}</a></td>
             <td class="px-4 py-2 whitespace-nowrap">
 			{{if .Name.Valid}}
 				{{.Name.String}}
@@ -48,7 +48,7 @@ var chatsTemplate = template.Must(template.New("chats").Parse(`<!DOCTYPE html>
 				{{end}}
 			{{end}}
 			</td>
-            <td class="px-4 py-2 whitespace-nowrap"><a class="text-blue-600 dark:text-blue-400" href="/chat/{{.ID}}">{{.Title.String}}</a></td>
+            <td class="px-4 py-2 whitespace-nowrap">{{.Title.String}}</td>
             <td class="px-4 py-2 whitespace-nowrap">{{if .HasDeal}}✔{{else}}—{{end}}</td>
             <td class="px-4 py-2">{{.LastMsg}}</td>
         </tr>

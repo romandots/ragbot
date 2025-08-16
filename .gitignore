@@ -3,3 +3,7 @@
 *.gguf
 education.txt
 nginx/default.conf
+
+*.md
+!CHANGELOG.md
+!README.md
