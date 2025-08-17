@@ -2,7 +2,9 @@ package bot
 
 import (
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"strings"
 	"sync"
 
@@ -97,13 +99,32 @@ func handleUserMessage(update tgbotapi.Update) {
 		username = update.Message.From.UserName
 	}
 	conversation.EnsureSession(repo, chatID, username)
+	
+	// Handle voice messages
+	if update.Message.Voice != nil {
+		userText, err := handleVoiceMessage(update.Message.Voice)
+		if err != nil {
+			log.Printf("Voice transcription error: %v", err)
+			replyToUser(chatID, "Извините, не удалось распознать голосовое сообщение. Попробуйте отправить текстом.")
+			return
+		}
+		// Continue processing as text message
+		processTextMessage(chatID, username, userText)
+		return
+	}
+	
 	userText := update.Message.Text
-	var answer string
-
+	
 	// Обработка команды /start - инициализируем общение как если бы пользователь написал "Привет"
 	if userText == "/start" {
 		userText = "Привет"
 	}
+	
+	processTextMessage(chatID, username, userText)
+}
+
+func processTextMessage(chatID int64, username, userText string) {
+	var answer string
 
 	defer func() {
 		conversation.AppendHistory(repo, chatID, "user", userText)
@@ -112,6 +133,15 @@ func handleUserMessage(update tgbotapi.Update) {
 		}
 	}()
 
+	// Create a minimal update for handleUserCommand
+	update := tgbotapi.Update{
+		Message: &tgbotapi.Message{
+			Text: userText,
+			Chat: &tgbotapi.Chat{ID: chatID},
+			From: &tgbotapi.User{UserName: username},
+		},
+	}
+	
 	if handleUserCommand(update, chatID) {
 		return
 	}
@@ -165,6 +195,40 @@ func handleUserMessage(update tgbotapi.Update) {
 	}
 
 	replyToUser(chatID, answer)
+}
+
+func handleVoiceMessage(voice *tgbotapi.Voice) (string, error) {
+	// Get file info from Telegram
+	fileConfig := tgbotapi.FileConfig{FileID: voice.FileID}
+	file, err := userBot.GetFile(fileConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to get file info: %v", err)
+	}
+
+	// Download the voice file
+	fileURL := file.Link(userBot.Token)
+	resp, err := http.Get(fileURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download voice file: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read file data
+	audioData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read voice file: %v", err)
+	}
+
+	// Determine file format (Telegram voice messages are usually OGG)
+	format := "ogg"
+
+	// Transcribe using AI client
+	transcription, err := aiClient.TranscribeAudio(audioData, format)
+	if err != nil {
+		return "", fmt.Errorf("failed to transcribe audio: %v", err)
+	}
+
+	return transcription, nil
 }
 
 func handleUserCommand(update tgbotapi.Update, chatID int64) bool {

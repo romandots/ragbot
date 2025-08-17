@@ -7,6 +7,7 @@ import (
 type ModelStrategy interface {
 	GenerateEmbedding(text string) ([]float32, error)
 	GenerateResponse(prompt string) (string, error)
+	TranscribeAudio(audioData []byte, format string) (string, error)
 }
 
 type AIClient struct {
@@ -26,4 +27,8 @@ func (a *AIClient) GenerateEmbedding(text string) ([]float32, error) {
 
 func (a *AIClient) GenerateResponse(prompt string) (string, error) {
 	return a.strategy.GenerateResponse(prompt)
+}
+
+func (a *AIClient) TranscribeAudio(audioData []byte, format string) (string, error) {
+	return a.strategy.TranscribeAudio(audioData, format)
 }
