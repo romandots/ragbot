@@ -24,6 +24,8 @@
 | `USER_TELEGRAM_TOKEN` | Токен для пользовательского Telegram бота |
 | `ADMIN_TELEGRAM_TOKEN` | Токен для административного Telegram бота |
 | `ADMIN_CHAT_IDS` | Список ID чатов администраторов (через запятую) |
+| `NOTIFICATION_TELEGRAM_TOKEN` | Токен для бота уведомлений |
+| `NOTIFICATION_CHAT_IDS` | Список ID чатов для уведомлений (через запятую) |
 
 ### Переменные для продакшн-развертывания
 
@@ -55,6 +57,26 @@
 | `STATS_PASS` | Пароль для доступа к странице статистики |
 | `TELEGRAM_CHANNEL` | Адрес Telegram-канала (без @) |
 
+## Архитектура ботов
+
+Система использует три отдельных Telegram бота:
+
+1. **UserBot** (`USER_TELEGRAM_TOKEN`) - основной бот для пользователей
+   - Отвечает на вопросы пользователей
+   - Обрабатывает заявки на обратный звонок
+   - Предоставляет информацию о услугах
+
+2. **AdminBot** (`ADMIN_TELEGRAM_TOKEN`) - бот для администрирования базы знаний
+   - Управление фрагментами знаний (добавление, изменение, удаление)
+   - Команды: `/start`, `/help`, `/update`, `/delete`, `/list`, `/stats`, `/chats`
+   - Уведомления о добавлении новых фрагментов
+
+3. **NotificationBot** (`NOTIFICATION_TELEGRAM_TOKEN`) - бот только для уведомлений
+   - Получает уведомления о новых заявках
+   - Получает уведомления о системных ошибках
+   - Доступна только команда `/chatId` для получения ID чата
+   - Может быть добавлен в канал для централизованных уведомлений
+
 ## Установка
 
 1. Клонируйте репозиторий:
@@ -75,6 +97,8 @@ POSTGRES_PASSWORD=your_secure_password_here
 USER_TELEGRAM_TOKEN=your_user_telegram_token
 ADMIN_TELEGRAM_TOKEN=your_admin_telegram_token
 ADMIN_CHAT_IDS=123456789,987654321
+NOTIFICATION_TELEGRAM_TOKEN=your_notification_telegram_token
+NOTIFICATION_CHAT_IDS=111111111,222222222
 TELEGRAM_CHANNEL=your_channel_name
 
 # Переменные для продакшн-развертывания
