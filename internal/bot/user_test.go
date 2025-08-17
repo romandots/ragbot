@@ -162,6 +162,47 @@ func TestTriggerWordsDetection(t *testing.T) {
 	}
 }
 
+func TestTriggerWordsManualDemo(t *testing.T) {
+	// This test demonstrates how the trigger words work
+	config.LoadSettings()
+	
+	demoTexts := []struct {
+		text     string
+		expected string
+	}{
+		{"Привет, покажи расписание занятий", "schedule"},
+		{"Сколько стоят цены на ваши услуги?", "price"},
+		{"Можете сказать прайс на абонементы?", "price"}, 
+		{"Какой график работы у студии?", "schedule"},
+		{"Позвать менеджера", "call"},
+		{"Хочу узнать стоимость обучения", "price"},
+		{"Обычный вопрос без триггеров", "none"},
+		{"Раsp студии", "schedule"},
+		{"price list please", "price"},
+	}
+	
+	for _, demo := range demoTexts {
+		lowerText := strings.ToLower(demo.text)
+		var triggered string
+		
+		if containsAny(lowerText, config.Settings.CallManagerTriggerWords) {
+			triggered = "call"
+		} else if containsAny(lowerText, config.Settings.ScheduleTriggerWords) {
+			triggered = "schedule"
+		} else if containsAny(lowerText, config.Settings.PriceTriggerWords) {
+			triggered = "price"
+		} else {
+			triggered = "none"
+		}
+		
+		if triggered != demo.expected {
+			t.Errorf("Text: '%s' - Expected trigger: %s, Got: %s", demo.text, demo.expected, triggered)
+		} else {
+			t.Logf("✓ Text: '%s' - Correctly triggered: %s", demo.text, triggered)
+		}
+	}
+}
+
 // Helper function to check if text contains any of the trigger words
 func containsAny(text string, triggerWords []string) bool {
 	for _, word := range triggerWords {
