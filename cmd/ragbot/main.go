@@ -49,6 +49,7 @@ func startEducationSourcesHandlers(cfg *config.AppConfig, repo *repository.Repos
 	ctx := context.Background()
 	sources := []education.Source{
 		&education.AdminSource{Token: cfg.AdminTelegramToken, AllowedIDs: cfg.AdminChatIDs},
+		&education.NotificationSource{Token: cfg.NotificationTelegramToken, AllowedIDs: cfg.NotificationChatIDs},
 	}
 	if cfg.EducationFilePath != "" {
 		sources = append(sources, &education.FileSource{Path: cfg.EducationFilePath, Interval: time.Hour})
