@@ -152,6 +152,16 @@ func handleUserMessage(update tgbotapi.Update) {
 		return
 	}
 
+	if util.ContainsStringFromSlice(lowerRequest, config.Settings.ScheduleTriggerWords) {
+		sendSchedule(chatID)
+		return
+	}
+
+	if util.ContainsStringFromSlice(lowerRequest, config.Settings.PriceTriggerWords) {
+		sendPrices(chatID)
+		return
+	}
+
 	answer, err := handler.ProcessQuestionWithHistory(repo, aiClient, chatID, userText)
 	if err != nil {
 		SendToAllAdmins(fmt.Sprintf(msgAdminErrorFormat, err))
