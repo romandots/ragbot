@@ -7,3 +7,4 @@ nginx/default.conf
 *.md
 !CHANGELOG.md
 !README.md
+ragbot

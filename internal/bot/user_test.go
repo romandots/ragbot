@@ -1,9 +1,11 @@
 package bot
 
 import (
+	"strings"
 	"testing"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"ragbot/internal/config"
 )
 
 func TestDeleteMessageAfterCallback(t *testing.T) {
@@ -76,4 +78,137 @@ func TestCallbackActions(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTriggerWordsDetection(t *testing.T) {
+	// Load configuration for testing
+	config.LoadSettings()
+
+	testCases := []struct {
+		name               string
+		userText           string
+		shouldTrigger      string
+		shouldNotTrigger   []string
+	}{
+		{
+			name:             "Schedule trigger words",
+			userText:         "Покажи расписание занятий",
+			shouldTrigger:    "schedule",
+			shouldNotTrigger: []string{"price", "call"},
+		},
+		{
+			name:             "Price trigger words",
+			userText:         "Сколько стоят цены на абонементы?",
+			shouldTrigger:    "price",
+			shouldNotTrigger: []string{"schedule", "call"},
+		},
+		{
+			name:             "Call manager trigger words",
+			userText:         "Позови менеджера пожалуйста",
+			shouldTrigger:    "call",
+			shouldNotTrigger: []string{"schedule", "price"},
+		},
+		{
+			name:             "Mixed text with schedule",
+			userText:         "Привет! Можете показать график занятий?",
+			shouldTrigger:    "schedule",
+			shouldNotTrigger: []string{"price", "call"},
+		},
+		{
+			name:             "Mixed text with price",
+			userText:         "Скажите прайс на ваши услуги",
+			shouldTrigger:    "price",
+			shouldNotTrigger: []string{"schedule", "call"},
+		},
+		{
+			name:             "No triggers",
+			userText:         "Привет! Как дела?",
+			shouldTrigger:    "",
+			shouldNotTrigger: []string{"schedule", "price", "call"},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			lowerText := strings.ToLower(tc.userText)
+			
+			// Check schedule triggers
+			scheduleTriggered := containsAny(lowerText, config.Settings.ScheduleTriggerWords)
+			if tc.shouldTrigger == "schedule" && !scheduleTriggered {
+				t.Errorf("Expected schedule trigger for text: %s", tc.userText)
+			}
+			if tc.shouldTrigger != "schedule" && scheduleTriggered {
+				t.Errorf("Unexpected schedule trigger for text: %s", tc.userText)
+			}
+
+			// Check price triggers
+			priceTriggered := containsAny(lowerText, config.Settings.PriceTriggerWords)
+			if tc.shouldTrigger == "price" && !priceTriggered {
+				t.Errorf("Expected price trigger for text: %s", tc.userText)
+			}
+			if tc.shouldTrigger != "price" && priceTriggered {
+				t.Errorf("Unexpected price trigger for text: %s", tc.userText)
+			}
+
+			// Check call manager triggers
+			callTriggered := containsAny(lowerText, config.Settings.CallManagerTriggerWords)
+			if tc.shouldTrigger == "call" && !callTriggered {
+				t.Errorf("Expected call manager trigger for text: %s", tc.userText)
+			}
+			if tc.shouldTrigger != "call" && callTriggered {
+				t.Errorf("Unexpected call manager trigger for text: %s", tc.userText)
+			}
+		})
+	}
+}
+
+func TestTriggerWordsManualDemo(t *testing.T) {
+	// This test demonstrates how the trigger words work
+	config.LoadSettings()
+	
+	demoTexts := []struct {
+		text     string
+		expected string
+	}{
+		{"Привет, покажи расписание занятий", "schedule"},
+		{"Сколько стоят цены на ваши услуги?", "price"},
+		{"Можете сказать прайс на абонементы?", "price"}, 
+		{"Какой график работы у студии?", "schedule"},
+		{"Позвать менеджера", "call"},
+		{"Хочу узнать стоимость обучения", "price"},
+		{"Обычный вопрос без триггеров", "none"},
+		{"Раsp студии", "schedule"},
+		{"price list please", "price"},
+	}
+	
+	for _, demo := range demoTexts {
+		lowerText := strings.ToLower(demo.text)
+		var triggered string
+		
+		if containsAny(lowerText, config.Settings.CallManagerTriggerWords) {
+			triggered = "call"
+		} else if containsAny(lowerText, config.Settings.ScheduleTriggerWords) {
+			triggered = "schedule"
+		} else if containsAny(lowerText, config.Settings.PriceTriggerWords) {
+			triggered = "price"
+		} else {
+			triggered = "none"
+		}
+		
+		if triggered != demo.expected {
+			t.Errorf("Text: '%s' - Expected trigger: %s, Got: %s", demo.text, demo.expected, triggered)
+		} else {
+			t.Logf("✓ Text: '%s' - Correctly triggered: %s", demo.text, triggered)
+		}
+	}
+}
+
+// Helper function to check if text contains any of the trigger words
+func containsAny(text string, triggerWords []string) bool {
+	for _, word := range triggerWords {
+		if strings.Contains(text, strings.ToLower(word)) {
+			return true
+		}
+	}
+	return false
 }
