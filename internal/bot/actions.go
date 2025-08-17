@@ -16,7 +16,7 @@ func finalizeContactRequest(chatID int64) {
 	info, err := conversation.GetChatInfoByChatID(repo, chatID)
 	if err != nil {
 		errMsg := fmt.Sprintf("Error sending lead to AMO: %v", err)
-		SendToAllAdmins(errMsg)
+		SendToAllNotifications(errMsg)
 		log.Println(errMsg)
 		replyToUser(chatID, "Извините, возниклка какая-то ошибка. Попробуйте повторить ваш запрос позднее.")
 		return
@@ -24,7 +24,7 @@ func finalizeContactRequest(chatID int64) {
 
 	link := fmt.Sprintf(chatUrlFormat, config.Config.BaseURL, info.ID)
 	adminMsg := fmt.Sprintf(msgAdminSummaryFormat, info.Name.String, info.Phone.String, info.Summary.String, link)
-	SendToAllAdmins(adminMsg)
+	SendToAllNotifications(adminMsg)
 
 	err = amo.SendLeadToAMO(repo, &info, link)
 	if err == nil {
@@ -33,7 +33,7 @@ func finalizeContactRequest(chatID int64) {
 	}
 
 	errMsg := fmt.Sprintf("Error sending lead to AMO: %v", err)
-	SendToAllAdmins(errMsg)
+	SendToAllNotifications(errMsg)
 	log.Println(errMsg)
 	replyToUser(chatID, "Извините, возниклка какая-то ошибка. Попробуйте повторить ваш запрос позднее.")
 }

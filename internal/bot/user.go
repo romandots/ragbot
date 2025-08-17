@@ -154,7 +154,7 @@ func handleUserMessage(update tgbotapi.Update) {
 
 	answer, err := handler.ProcessQuestionWithHistory(repo, aiClient, chatID, userText)
 	if err != nil {
-		SendToAllAdmins(fmt.Sprintf(msgAdminErrorFormat, err))
+		SendToAllNotifications(fmt.Sprintf(msgAdminErrorFormat, err))
 		answer = msgUserError
 	} else {
 		lowerAnswer := strings.ToLower(answer)

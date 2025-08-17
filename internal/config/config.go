@@ -9,22 +9,24 @@ import (
 )
 
 type AppConfig struct {
-	BaseURL             string
-	DatabaseURL         string
-	UseLocalModel       bool
-	OpenAIAPIKey        string
-	UserTelegramToken   string
-	UserTelegramBotName string
-	AdminTelegramToken  string
-	AdminChatIDs        []int64
-	EducationFilePath   string
-	UseExternalSource   bool
-	YandexYMLURL        string
-	AmoDomain           string
-	AmoAccessToken      string
-	AdminUsername       string
-	AdminPassword       string
-	TelegramChannel     string
+	BaseURL                   string
+	DatabaseURL               string
+	UseLocalModel             bool
+	OpenAIAPIKey              string
+	UserTelegramToken         string
+	UserTelegramBotName       string
+	AdminTelegramToken        string
+	AdminChatIDs              []int64
+	NotificationTelegramToken string
+	NotificationChatIDs       []int64
+	EducationFilePath         string
+	UseExternalSource         bool
+	YandexYMLURL              string
+	AmoDomain                 string
+	AmoAccessToken            string
+	AdminUsername             string
+	AdminPassword             string
+	TelegramChannel           string
 }
 
 type AppSettings struct {
@@ -73,6 +75,11 @@ func LoadConfig() *AppConfig {
 		log.Fatalln("ADMIN_TELEGRAM_TOKEN not set")
 	}
 
+	notificationToken := os.Getenv("NOTIFICATION_TELEGRAM_TOKEN")
+	if notificationToken == "" {
+		log.Fatalln("NOTIFICATION_TELEGRAM_TOKEN not set")
+	}
+
 	eduFile := os.Getenv("EDUCATION_FILE_PATH")
 	ymlURL := os.Getenv("YANDEX_YML_URL")
 	amoDomain := os.Getenv("AMO_DOMAIN")
@@ -96,23 +103,38 @@ func LoadConfig() *AppConfig {
 		}
 	}
 
+	// Читаем NOTIFICATION_CHAT_IDS как строку "id1,id2,id3"
+	notificationIDsEnv := os.Getenv("NOTIFICATION_CHAT_IDS")
+	var notificationIDs []int64
+	for _, part := range strings.Split(notificationIDsEnv, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			id, err := strconv.ParseInt(part, 10, 64)
+			if err != nil {
+				log.Fatalf("Invalid NOTIFICATION_CHAT_IDS value: %v", err)
+			}
+			notificationIDs = append(notificationIDs, id)
+		}
+	}
+
 	Config = &AppConfig{
-		BaseURL:             baseURL,
-		DatabaseURL:         url,
-		UseLocalModel:       useLocal,
-		OpenAIAPIKey:        apiKey,
-		UserTelegramToken:   userToken,
-		UserTelegramBotName: userBotName,
-		AdminTelegramToken:  adminToken,
-		AdminChatIDs:        adminIDs,
-		EducationFilePath:   eduFile,
-		UseExternalSource:   useExternal,
-		YandexYMLURL:        ymlURL,
-		AmoDomain:           amoDomain,
-		AmoAccessToken:      amoToken,
-		TelegramChannel:     telegramChannel,
-		AdminUsername:       util.GetEnvString("ADMIN_USERNAME", "admin"),
-		AdminPassword:       util.GetEnvString("ADMIN_PASSWORD", "secret"),
+		BaseURL:                   baseURL,
+		DatabaseURL:               url,
+		UseLocalModel:             useLocal,
+		OpenAIAPIKey:              apiKey,
+		UserTelegramToken:         userToken,
+		UserTelegramBotName:       userBotName,
+		AdminTelegramToken:        adminToken,
+		AdminChatIDs:              adminIDs,
+		NotificationTelegramToken: notificationToken,
+		NotificationChatIDs:       notificationIDs,
+		EducationFilePath:         eduFile,
+		UseExternalSource:         useExternal,
+		YandexYMLURL:              ymlURL,
+		AmoDomain:                 amoDomain,
+		AmoAccessToken:            amoToken,
+		TelegramChannel:           telegramChannel,
+		AdminUsername:             util.GetEnvString("ADMIN_USERNAME", "admin"),
+		AdminPassword:             util.GetEnvString("ADMIN_PASSWORD", "secret"),
 	}
 
 	return Config
