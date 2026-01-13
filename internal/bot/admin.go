@@ -25,6 +25,9 @@ func StartAdminBot(repo *repository.Repository, token string, allowedIDs []int64
 	adminBot = connect(token)
 	log.Println("Admin bot connected to Telegram API")
 
+	// Удаляем webhook перед использованием getUpdates
+	deleteWebhook(adminBot)
+
 	registerAdminCommands()
 	handleAdminUpdates(repo, allowedIDs)
 }

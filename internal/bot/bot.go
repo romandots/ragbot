@@ -17,3 +17,16 @@ func connect(token string) *tgbotapi.BotAPI {
 	}
 	return bot
 }
+
+// deleteWebhook удаляет активный webhook перед использованием getUpdates
+func deleteWebhook(bot *tgbotapi.BotAPI) {
+	config := tgbotapi.DeleteWebhookConfig{
+		DropPendingUpdates: true,
+	}
+	_, err := bot.Request(config)
+	if err != nil {
+		log.Printf("Warning: Failed to delete webhook (may not be set): %v", err)
+	} else {
+		log.Println("Webhook deleted successfully")
+	}
+}

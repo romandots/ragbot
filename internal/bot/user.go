@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	ai "ragbot/internal/ai"
 	"ragbot/internal/config"
 	"ragbot/internal/conversation"
@@ -14,6 +13,8 @@ import (
 	"ragbot/internal/repository"
 	"ragbot/internal/tansultant"
 	"ragbot/internal/util"
+
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 type contactState struct {
@@ -49,6 +50,9 @@ func StartUserBot(r *repository.Repository, ac *ai.AIClient, tc *tansultant.Clie
 	repo = r
 	userBot = connect(token)
 	log.Println("User bot connected to Telegram API")
+
+	// Удаляем webhook перед использованием getUpdates
+	deleteWebhook(userBot)
 
 	registerUserCommands()
 	handleUserUpdates()
