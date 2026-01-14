@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	go_openai "github.com/sashabaranov/go-openai"
@@ -39,4 +40,19 @@ func (g *GPTStrategy) GenerateResponse(prompt string) (string, error) {
 		return "", fmt.Errorf("OpenAI chat error: %v", err)
 	}
 	return resp.Choices[0].Message.Content, nil
+}
+
+func (g *GPTStrategy) TranscribeAudio(audioData []byte, format string) (string, error) {
+	req := go_openai.AudioRequest{
+		Model:    go_openai.Whisper1,
+		Reader:   bytes.NewReader(audioData),
+		FilePath: "voice." + format,
+		Format:   go_openai.AudioResponseFormatText,
+	}
+	
+	resp, err := g.client.CreateTranscription(context.Background(), req)
+	if err != nil {
+		return "", fmt.Errorf("OpenAI transcription error: %v", err)
+	}
+	return resp.Text, nil
 }

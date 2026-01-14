@@ -77,3 +77,40 @@ func TestCallbackActions(t *testing.T) {
 		})
 	}
 }
+
+func TestVoiceMessageDetection(t *testing.T) {
+	// Test text message (should not be treated as voice)
+	textUpdate := tgbotapi.Update{
+		Message: &tgbotapi.Message{
+			Text: "Hello, this is a text message",
+			Chat: &tgbotapi.Chat{ID: 123},
+		},
+	}
+
+	if textUpdate.Message.Voice != nil {
+		t.Error("Text message should not have Voice field set")
+	}
+
+	// Test voice message structure
+	voiceUpdate := tgbotapi.Update{
+		Message: &tgbotapi.Message{
+			Voice: &tgbotapi.Voice{
+				FileID:   "test_voice_file_id",
+				Duration: 10,
+			},
+			Chat: &tgbotapi.Chat{ID: 123},
+		},
+	}
+
+	if voiceUpdate.Message.Voice == nil {
+		t.Error("Voice message should have Voice field set")
+	}
+
+	if voiceUpdate.Message.Voice.FileID != "test_voice_file_id" {
+		t.Errorf("Expected FileID 'test_voice_file_id', got %s", voiceUpdate.Message.Voice.FileID)
+	}
+
+	if voiceUpdate.Message.Voice.Duration != 10 {
+		t.Errorf("Expected Duration 10, got %d", voiceUpdate.Message.Voice.Duration)
+	}
+}

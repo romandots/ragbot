@@ -15,3 +15,7 @@ func (l *LocalStrategy) GenerateEmbedding(text string) ([]float32, error) {
 func (l *LocalStrategy) GenerateResponse(prompt string) (string, error) {
 	return "", fmt.Errorf("local generation not implemented")
 }
+
+func (l *LocalStrategy) TranscribeAudio(audioData []byte, format string) (string, error) {
+	return "", fmt.Errorf("local transcription not implemented")
+}
